@@ -260,7 +260,7 @@ export const BorrowerDashboard: React.FC = () => {
                     <span className="text-sm text-slate-600 mt-1 block">We are verifying your documents. Your loan application is locked until verification is complete.</span>
                   </div>
                 </div>
-                <Link to="/kyc" className="mt-2 py-3.5 text-center rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-sm transition-all">
+                <Link to="/kyc" className="mt-2 py-3 text-center rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all cursor-pointer">
                   Check Upload Details
                 </Link>
               </div>
@@ -321,7 +321,7 @@ export const BorrowerDashboard: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => alert("Repayment interface is coming soon!")}
-                  className="mt-4 w-full py-3.5 bg-primary hover:bg-[#1B5E20] text-white font-bold rounded-xl text-sm shadow-sm transition-all"
+                  className="mt-4 w-full py-3.5 bg-primary hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold rounded-xl text-sm shadow-sm transition-all cursor-pointer"
                 >
                   Pay Current EMI
                 </button>
@@ -335,10 +335,10 @@ export const BorrowerDashboard: React.FC = () => {
                 <button
                   onClick={() => kyc?.status === 'APPROVED' ? setActiveTab('loan') : alert('Verification required first!')}
                   disabled={kyc?.status !== 'APPROVED'}
-                  className={`w-full py-4.5 font-bold rounded-xl text-md shadow-md transition-all ${
+                  className={`w-full py-4 font-bold rounded-xl text-md shadow-md transition-all cursor-pointer ${
                     kyc?.status === 'APPROVED' 
-                      ? 'bg-primary text-white hover:bg-[#1B5E20]' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      ? 'bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98]' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
                   }`}
                 >
                   Apply for Loan
@@ -465,7 +465,7 @@ export const BorrowerDashboard: React.FC = () => {
 
                   <button
                     type="submit"
-                    className="w-full py-4.5 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md"
+                    className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer"
                   >
                     Continue
                   </button>
@@ -566,10 +566,10 @@ export const BorrowerDashboard: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-3 mt-1">
-                      <button onClick={handleAcceptRestructure} className="flex-1 py-3 bg-primary hover:bg-[#1B5E20] text-white font-bold rounded-xl text-sm shadow-sm transition-all">
+                      <button onClick={handleAcceptRestructure} className="flex-1 py-3 bg-primary hover:bg-[#1B5E20] text-white font-bold rounded-xl text-sm shadow-sm active:scale-[0.98] transition-all cursor-pointer">
                         Accept Suggested Offer
                       </button>
-                      <button onClick={() => setLoanState('form')} className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold rounded-xl text-sm transition-all">
+                      <button onClick={() => setLoanState('form')} className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-sm active:scale-[0.98] transition-all cursor-pointer">
                         Decline
                       </button>
                     </div>
@@ -585,7 +585,7 @@ export const BorrowerDashboard: React.FC = () => {
                     <p className="text-sm text-slate-600 mt-2">
                       Your loan of ₹{analysisResult.loan?.amount} has been successfully created. We will update the disburals ledger shortly.
                     </p>
-                    <button onClick={() => setLoanState('form')} className="mt-4 px-6 py-2.5 bg-primary text-white font-bold rounded-xl text-sm hover:bg-[#1B5E20]">
+                    <button onClick={() => setLoanState('form')} className="mt-4 px-6 py-2.5 bg-primary text-white font-bold rounded-xl text-sm hover:bg-[#1B5E20] active:scale-[0.98] transition-all cursor-pointer">
                       Done
                     </button>
                   </div>
@@ -751,7 +751,7 @@ export const BorrowerDashboard: React.FC = () => {
 
             <button
               onClick={logout}
-              className="w-full py-4.5 rounded-xl font-bold border border-red-200 text-danger bg-red-50 hover:bg-red-100 shadow-xs transition-all text-md"
+              className="w-full py-4 rounded-xl font-bold border border-red-200 text-danger bg-red-50 hover:bg-red-100 active:scale-[0.98] shadow-xs transition-all text-md cursor-pointer"
             >
               Sign Out
             </button>

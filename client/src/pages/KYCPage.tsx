@@ -68,7 +68,7 @@ export const KYCPage: React.FC = () => {
 
     try {
       const response = await api.post('/kyc/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': undefined }
       });
       setKyc(response.data.kyc);
       alert('Verification files uploaded successfully for review!');
@@ -305,7 +305,7 @@ export const KYCPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-4.5 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md flex items-center justify-center"
+                className="w-full py-4 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md flex items-center justify-center cursor-pointer disabled:opacity-50"
               >
                 {submitting ? 'Submitting verification profile...' : 'Submit Verification Profile'}
               </button>

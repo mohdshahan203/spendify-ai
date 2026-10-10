@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import LandingCanvas from '../components/canvas/LandingCanvas';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -14,6 +15,7 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('BORROWER');
 
   // Step 2: OTP Verification mockup
@@ -89,7 +91,7 @@ export const RegisterPage: React.FC = () => {
 
     try {
       await api.post('/kyc/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': undefined }
       });
       setStep(4);
     } catch (err: any) {
@@ -200,20 +202,30 @@ export const RegisterPage: React.FC = () => {
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-bold text-slate-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none focus:ring-2 focus:ring-accent"
-                placeholder="Must be at least 8 characters"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3.5 pr-12 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none focus:ring-2 focus:ring-accent"
+                  placeholder="Must be at least 8 characters"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 p-1 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                  title={showPassword ? 'Hide Password' : 'Show Password'}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md"
+              className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
@@ -248,7 +260,7 @@ export const RegisterPage: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md"
+              className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer"
             >
               Verify Code
             </button>
@@ -256,7 +268,7 @@ export const RegisterPage: React.FC = () => {
             <button 
               type="button" 
               onClick={() => alert("Code resent!")}
-              className="text-sm font-bold text-primary hover:underline self-center"
+              className="text-sm font-bold text-primary hover:underline self-center cursor-pointer"
             >
               Resend verification code
             </button>
@@ -395,7 +407,7 @@ export const RegisterPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md"
+              className="w-full py-4 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer disabled:opacity-50"
             >
               {loading ? 'Uploading documents...' : 'Submit Documents'}
             </button>
@@ -411,7 +423,7 @@ export const RegisterPage: React.FC = () => {
             
             <div>
               <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Registration Successful!</h2>
-              <h3 className="text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full inline-block">KYC Pending Review</h3>
+              <h3 className="text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full inline-block border border-amber-200">KYC Pending Review</h3>
               <p className="text-slate-500 text-md mt-4 max-w-sm">
                 We are verifying your documents. Our loan officers will approve your profile shortly. Thank you for your patience!
               </p>
@@ -419,7 +431,7 @@ export const RegisterPage: React.FC = () => {
 
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full py-4 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-md"
+              className="w-full py-4 mt-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer"
             >
               Go to Dashboard
             </button>

@@ -55,6 +55,9 @@ class CreditScorer:
         self._using_fallback: bool = False
 
         model_path = Path(model_dir) / "credit_scorer.joblib"
+        if not model_path.exists():
+            model_path = Path(__file__).resolve().parent.parent.parent / "trained_models" / "credit_scorer.joblib"
+
         try:
             import joblib  # type: ignore[import-untyped]
 

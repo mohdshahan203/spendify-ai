@@ -23,15 +23,9 @@ export const Particles: React.FC = () => {
 
   return (
     <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-          count={count}
-          array={positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
+      <bufferGeometry
+        onUpdate={(self) => self.setAttribute('position', new THREE.BufferAttribute(positions, 3))}
+      />
       <pointsMaterial
         color="#818cf8"
         size={0.06}

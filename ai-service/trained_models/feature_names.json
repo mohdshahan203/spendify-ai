@@ -1,0 +1,22 @@
+[
+  "expense_to_income_ratio",
+  "debt_to_income_ratio",
+  "savings_ratio",
+  "annual_income",
+  "monthly_income",
+  "monthly_expenses",
+  "savings",
+  "total_debt",
+  "credit_utilization",
+  "num_credit_accounts",
+  "num_loans",
+  "payment_history_pct",
+  "credit_history_length_months",
+  "recent_inquiries",
+  "bankruptcies",
+  "tax_liens",
+  "age",
+  "employment_length_months",
+  "dependents",
+  "monthly_disposable_income"
+]

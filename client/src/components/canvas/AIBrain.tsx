@@ -44,15 +44,9 @@ export const AIBrain: React.FC = () => {
   return (
     <group ref={groupRef} position={[0, 1.8, -3.5]}>
       <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[positions, 3]}
-            count={count}
-            array={positions}
-            itemSize={3}
-          />
-        </bufferGeometry>
+        <bufferGeometry
+          onUpdate={(self) => self.setAttribute('position', new THREE.BufferAttribute(positions, 3))}
+        />
         <pointsMaterial
           color="#4CAF50"
           size={0.08}

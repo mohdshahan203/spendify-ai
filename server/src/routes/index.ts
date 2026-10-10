@@ -74,5 +74,11 @@ router.get(
   authorizeRoles('ADMIN', 'OFFICER'),
   adminController.getAdminStats
 );
+router.get(
+  '/admin/profiles',
+  authenticateJWT,
+  authorizeRoles('ADMIN', 'OFFICER'),
+  adminController.getBorrowerProfiles
+);
 
 export default router;

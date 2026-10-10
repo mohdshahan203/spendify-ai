@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LandingCanvas from '../components/canvas/LandingCanvas';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
@@ -70,20 +72,30 @@ export const LoginPage: React.FC = () => {
               <label className="text-sm font-bold text-slate-700">Password</label>
               <a href="#forgot" className="text-xs font-bold text-primary hover:underline">Forgot password?</a>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-4 py-4 rounded-xl border border-slate-200 bg-white text-slate-800 text-md focus:border-primary focus:ring-2 focus:ring-accent focus:outline-none transition-all"
-              placeholder="••••••••"
-            />
+            <div className="relative flex items-center">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-4 py-4 pr-12 rounded-xl border border-slate-200 bg-white text-slate-800 text-md focus:border-primary focus:ring-2 focus:ring-accent focus:outline-none transition-all"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 p-1 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                title={showPassword ? 'Hide Password' : 'Show Password'}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4.5 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all flex items-center justify-center text-md"
+            className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all flex items-center justify-center text-md cursor-pointer disabled:opacity-50"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
@@ -99,7 +111,7 @@ export const LoginPage: React.FC = () => {
         {/* Google Sign-In Mockup */}
         <button 
           onClick={() => alert("Google Login is coming soon!")}
-          className="w-full py-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all font-bold text-slate-700 flex items-center justify-center gap-3 text-sm shadow-sm"
+          className="w-full py-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all font-bold text-slate-700 flex items-center justify-center gap-3 text-sm shadow-xs cursor-pointer"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.61 14.99 1 12 1 7.24 1 3.21 3.73 1.24 7.72l3.97 3.08C6.18 7.64 8.85 5.04 12 5.04z" />

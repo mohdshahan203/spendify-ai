@@ -9,7 +9,11 @@
     "dev": "nodemon --watch src -e ts --exec ts-node src/app.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "import-offline-data": "npx tsx scripts/importOfflineCustomers.ts"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.12.1",

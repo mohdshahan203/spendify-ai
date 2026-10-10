@@ -40,6 +40,7 @@ export const uploadKYC = async (req: AuthenticatedRequest, res: Response) => {
     const kyc = await dbService.kycDocument.upsert({
       where: { userId },
       create: {
+        userId,
         aadhaarNumber: aadhaarNumber || '',
         aadhaarUrl,
         panNumber: panNumber || '',

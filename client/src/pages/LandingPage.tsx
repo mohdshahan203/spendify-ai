@@ -16,16 +16,16 @@ export const LandingPage: React.FC = () => {
           <span className="text-3xl font-extrabold tracking-tight text-primary">
             SpendiFy
           </span>
-          <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-accent text-primary rounded-full">
+          <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-accent text-primary rounded-full border border-green-200/60">
             AI Assist
           </span>
         </div>
         
         <div className="flex items-center gap-4">
-          <Link to="/login" className="px-5 py-2 text-sm font-semibold text-slate-600 hover:text-primary transition-colors">
+          <Link to="/login" className="px-5 py-2 text-sm font-bold text-slate-700 hover:text-primary transition-colors">
             Login
           </Link>
-          <Link to="/register" className="px-6 py-2.5 text-sm font-bold rounded-full bg-primary text-white hover:bg-[#1B5E20] shadow-sm transition-all">
+          <Link to="/register" className="px-6 py-2.5 text-sm font-bold rounded-xl bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-sm transition-all">
             Get Started
           </Link>
         </div>
@@ -33,7 +33,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Hero Section */}
       <section className="relative z-10 flex flex-col items-center justify-center min-h-[80vh] text-center px-6 max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-xs font-semibold rounded-full bg-accent text-primary">
+        <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-xs font-semibold rounded-full bg-accent text-primary border border-green-200">
           <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
           <span>Simple, Safe, and Fast Micro-Loans</span>
         </div>
@@ -48,10 +48,10 @@ export const LandingPage: React.FC = () => {
         </p>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-          <Link to="/register" className="w-full sm:w-auto px-10 py-4.5 text-md font-bold rounded-full bg-primary text-white hover:bg-[#1B5E20] shadow-md transition-all text-center">
+          <Link to="/register" className="w-full sm:w-auto px-10 py-4 text-md font-bold rounded-xl bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-center">
             Apply For Loan
           </Link>
-          <a href="#how-it-works" className="w-full sm:w-auto px-10 py-4.5 text-md font-bold rounded-full border border-slate-200 hover:bg-slate-50 transition-all text-center text-slate-700">
+          <a href="#how-it-works" className="w-full sm:w-auto px-10 py-4 text-md font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition-all text-center text-slate-700 shadow-xs">
             Learn More
           </a>
         </div>

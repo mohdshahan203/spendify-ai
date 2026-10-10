@@ -1,0 +1,14 @@
+name,email,phone,age,employment_type,employment_length_months,annual_income,monthly_income,monthly_expenses,total_debt,savings_balance,credit_utilization,num_credit_cards,num_active_loans,payment_history_score,years_of_credit_history,num_hard_inquiries,bankruptcies,tax_liens,dependents,requested_loan_amount,requested_tenure_months,interest_rate,is_default,risk_category
+Abhishek,abhishek.ledger@spendify.com,+919111111001,34,salaried,48,780000,65000,22000,15000,180000,0.18,2,2,1.00,6,1,0,0,1,15000,12,12.0,0,LOW
+Appu,appu.ledger@spendify.com,+919111111002,28,salaried,24,456000,38000,24000,6000,25000,0.45,1,1,0.67,3,3,0,0,0,6000,6,12.0,0,MEDIUM
+Naresh,naresh.ledger@spendify.com,+919111111003,36,self_employed,60,660000,55000,35000,15000,40000,0.52,3,1,0.67,5,4,0,0,2,15000,12,12.0,0,MEDIUM
+Shishir,shishir.ledger@spendify.com,+919111111004,31,salaried,36,600000,50000,18000,8000,120000,0.20,2,1,1.00,5,1,0,0,1,8000,12,12.0,0,LOW
+Santosh,santosh.ledger@spendify.com,+919111111005,29,business,18,384000,32000,28000,12000,10000,0.88,4,1,0.00,2,6,0,0,1,12000,12,12.0,1,HIGH
+Aditya,aditya.ledger@spendify.com,+919111111006,27,salaried,30,540000,45000,16000,5000,90000,0.15,1,1,1.00,4,1,0,0,0,5000,6,12.0,0,LOW
+Gundu,gundu.ledger@spendify.com,+919111111007,42,self_employed,96,1140000,95000,38000,28000,250000,0.25,3,2,1.00,10,1,0,0,2,28000,12,12.0,0,LOW
+Shrishail,shrishail.ledger@spendify.com,+919111111008,33,salaried,36,420000,35000,23000,7000,18000,0.55,2,1,0.50,4,3,0,0,1,7000,6,12.0,0,MEDIUM
+Omkar,omkar.ledger@spendify.com,+919111111009,30,salaried,42,576000,48000,26000,10000,45000,0.42,2,1,0.67,4,2,0,0,1,10000,12,12.0,0,MEDIUM
+Karthik,karthik.ledger@spendify.com,+9191111110010,35,salaried,54,720000,60000,20000,9000,150000,0.19,2,1,1.00,7,1,0,0,1,9000,12,12.0,0,LOW
+Rakesh,rakesh.ledger@spendify.com,+9191111110011,32,salaried,40,624000,52000,19000,7000,11000,0.22,2,1,1.00,5,1,0,0,0,7000,6,12.0,0,LOW
+Manoj,manoj.ledger@spendify.com,+9191111110012,26,freelancer,12,360000,30000,27000,12000,8000,0.92,3,1,0.00,1,7,0,0,0,12000,12,12.0,1,HIGH
+Suresh,suresh.ledger@spendify.com,+9191111110013,29,salaried,28,504000,42000,17000,5000,75000,0.21,1,1,1.00,3,1,0,0,0,5000,6,12.0,0,LOW

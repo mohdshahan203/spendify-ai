@@ -25,6 +25,18 @@ export const BlockchainNetwork: React.FC = () => {
     }
   });
 
+  // Memoize line connection geometries
+  const lineGeometries = useMemo(() => {
+    return nodePositions.map((pos, idx) => {
+      const nextPos = nodePositions[(idx + 1) % nodesCount];
+      const points = [
+        new THREE.Vector3(...pos),
+        new THREE.Vector3(...nextPos)
+      ];
+      return new THREE.BufferGeometry().setFromPoints(points);
+    });
+  }, [nodePositions, nodesCount]);
+
   return (
     <group ref={groupRef} position={[0, -1.5, -4]}>
       {nodePositions.map((pos, idx) => (
@@ -44,21 +56,11 @@ export const BlockchainNetwork: React.FC = () => {
       ))}
 
       {/* Render line connections between random nodes */}
-      {nodePositions.map((pos, idx) => {
-        // Connect to next node to form a network ring/chain
-        const nextPos = nodePositions[(idx + 1) % nodesCount];
-        const points = [
-          new THREE.Vector3(...pos),
-          new THREE.Vector3(...nextPos)
-        ];
-        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-
-        return (
-          <lineSegments key={`line-${idx}`} geometry={lineGeometry}>
-            <lineBasicMaterial color="#A5D6A7" transparent opacity={0.25} linewidth={1} />
-          </lineSegments>
-        );
-      })}
+      {lineGeometries.map((lineGeometry, idx) => (
+        <lineSegments key={`line-${idx}`} geometry={lineGeometry}>
+          <lineBasicMaterial color="#A5D6A7" transparent opacity={0.25} linewidth={1} />
+        </lineSegments>
+      ))}
     </group>
   );
 };

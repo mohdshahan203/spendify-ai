@@ -146,3 +146,71 @@ export const getAdminStats = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to aggregate analytics.' });
   }
 };
+
+export const getBorrowerProfiles = async (req: Request, res: Response) => {
+  try {
+    const users = await dbService.user.findMany();
+    const borrowers = users.filter(u => u.role === 'BORROWER');
+    const loans = await dbService.loan.findMany();
+    const kycDocs = await dbService.kycDocument.findMany();
+
+    const profiles = borrowers.map(b => {
+      const userKyc = kycDocs.find(k => k.userId === b.id);
+      const userLoans = loans.filter(l => l.userId === b.id);
+      const latestLoan = userLoans.length > 0 ? userLoans[userLoans.length - 1] : null;
+      
+      let spendingHabits = null;
+      let occupation = 'Borrower';
+      
+      if (latestLoan?.prediction?.shapExplanation) {
+        try {
+          const exp = typeof latestLoan.prediction.shapExplanation === 'string'
+            ? JSON.parse(latestLoan.prediction.shapExplanation)
+            : latestLoan.prediction.shapExplanation;
+          spendingHabits = exp.spendingHabits || null;
+          occupation = exp.occupation || 'Borrower';
+        } catch {}
+      }
+
+      return {
+        id: b.id,
+        name: b.name,
+        email: b.email,
+        phone: b.phone,
+        occupation,
+        kycStatus: userKyc?.status || 'NOT_STARTED',
+        aadhaarNumber: userKyc?.aadhaarNumber || 'N/A',
+        panNumber: userKyc?.panNumber || 'N/A',
+        latestLoan: latestLoan ? {
+          amount: latestLoan.amount,
+          tenure: latestLoan.tenureMonths,
+          status: latestLoan.status,
+          emi: latestLoan.emi,
+          interestRate: latestLoan.interestRate
+        } : null,
+        creditScore: latestLoan?.prediction?.creditScore || 720,
+        financialHealth: latestLoan?.prediction?.financialHealth || 80,
+        riskCategory: latestLoan?.prediction?.riskCategory || 'LOW',
+        defaultProbability: latestLoan?.prediction?.defaultProbability || 0.1,
+        spendingHabits: spendingHabits || {
+          categories: [
+            { name: 'Household Essentials', percentage: 40, color: '#1976D2' },
+            { name: 'Rent & Bills', percentage: 30, color: '#0288D1' },
+            { name: 'Dining & Entertainment', percentage: 20, color: '#ED6C02' },
+            { name: 'Savings & Investments', percentage: 10, color: '#2E7D32' }
+          ],
+          monthlyIncome: 50000,
+          monthlyExpenses: 40000,
+          savingsRate: '20%',
+          spendingPattern: 'Standard Balanced Budget'
+        }
+      };
+    });
+
+    res.status(200).json(profiles);
+  } catch (error: any) {
+    console.error('Get borrower profiles error:', error);
+    res.status(500).json({ error: 'Failed to retrieve borrower profiles.' });
+  }
+};
+

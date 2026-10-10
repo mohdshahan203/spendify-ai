@@ -9,7 +9,10 @@ import {
   ShieldAlert, 
   CheckCircle, 
   XCircle, 
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  PieChart
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -18,6 +21,7 @@ export const AdminDashboard: React.FC = () => {
   // States
   const [pendingKycs, setPendingKycs] = useState<KYCDocument[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +29,9 @@ export const AdminDashboard: React.FC = () => {
   const [auditUserKyc, setAuditUserKyc] = useState<KYCDocument | null>(null);
   const [auditNotes, setAuditNotes] = useState('');
   const [auditing, setAuditing] = useState(false);
+
+  // Expanded profile accordion ID
+  const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
 
   const fetchAdminData = async () => {
     try {
@@ -36,6 +43,9 @@ export const AdminDashboard: React.FC = () => {
 
       const loansRes = await api.get('/admin/loans');
       setLoans(loansRes.data);
+
+      const profilesRes = await api.get('/admin/profiles');
+      setProfiles(profilesRes.data);
     } catch (err) {
       console.error('Error fetching admin details:', err);
     } finally {
@@ -92,16 +102,21 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-white text-slate-800 pb-16">
       {/* Navbar */}
-      <nav className="w-full px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-30">
+      <nav className="w-full px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-2">
           <span className="text-2xl font-extrabold tracking-tight text-primary">
             SpendiFy
           </span>
-          <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-accent text-primary uppercase">
+          <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-accent text-primary border border-green-200 uppercase">
             Admin Console
           </span>
         </div>
-        <button onClick={logout} className="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 font-bold text-slate-700">Sign Out</button>
+        <button 
+          onClick={logout} 
+          className="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all font-bold text-slate-700 cursor-pointer"
+        >
+          Sign Out
+        </button>
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 mt-8 flex flex-col gap-8">
@@ -111,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Total Borrowers */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center text-primary">
                 <Users size={22} />
               </div>
@@ -122,7 +137,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Total Volume */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] flex items-center justify-center text-[#43A047]">
                 <Landmark size={22} />
               </div>
@@ -133,7 +148,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Approvals */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] flex items-center justify-center text-[#43A047]">
                 <FileCheck size={22} />
               </div>
@@ -144,7 +159,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {/* High-risk Alerts */}
-            <div className="p-6 rounded-3xl bg-red-50/50 border border-red-100 shadow-sm flex items-center gap-4">
+            <div className="p-6 rounded-3xl bg-red-50/50 border border-red-100 shadow-xs flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-[#E53935]">
                 <ShieldAlert size={22} />
               </div>
@@ -159,7 +174,7 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Audit Document Auditing panel */}
         {auditUserKyc && (
-          <div className="p-8 rounded-3xl bg-accent/40 border border-green-200 flex flex-col gap-6">
+          <div className="p-8 rounded-3xl bg-accent/40 border border-green-200 flex flex-col gap-6 shadow-sm">
             <h3 className="text-xl font-extrabold text-primary flex items-center gap-2">
               🔍 Auditing Documents: {auditUserKyc.user?.name || 'Borrower'}
             </h3>
@@ -231,20 +246,20 @@ export const AdminDashboard: React.FC = () => {
               <button 
                 onClick={() => handleVerifyKyc(auditUserKyc.userId, 'APPROVED')}
                 disabled={auditing}
-                className="px-6 py-3 rounded-xl bg-primary text-white text-xs font-bold hover:bg-[#1B5E20] shadow-sm transition-all flex items-center gap-1.5"
+                className="px-6 py-3 rounded-xl bg-primary text-white text-xs font-bold hover:bg-[#1B5E20] active:scale-[0.98] shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle size={14} /> Approve Profile
               </button>
               <button 
                 onClick={() => handleVerifyKyc(auditUserKyc.userId, 'REJECTED')}
                 disabled={auditing || !auditNotes.trim()}
-                className="px-6 py-3 rounded-xl bg-danger text-white text-xs font-bold hover:bg-[#D32F2F] disabled:opacity-40 shadow-sm transition-all flex items-center gap-1.5"
+                className="px-6 py-3 rounded-xl bg-danger text-white text-xs font-bold hover:bg-[#D32F2F] active:scale-[0.98] disabled:opacity-40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <XCircle size={14} /> Reject Profile
               </button>
               <button 
                 onClick={() => setAuditUserKyc(null)}
-                className="px-5 py-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                className="px-5 py-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -256,7 +271,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Pending KYC Reviews */}
-          <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex flex-col gap-5">
+          <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex flex-col gap-5">
             <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
               ⏳ Pending Document Reviews ({pendingKycs.length})
             </h3>
@@ -275,7 +290,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => { setAuditUserKyc(kycDoc); setAuditNotes(''); }}
-                      className="px-4 py-2 rounded-xl bg-accent text-primary text-xs font-bold hover:bg-green-100 transition-all border border-green-200"
+                      className="px-4 py-2 rounded-xl bg-accent text-primary text-xs font-bold hover:bg-green-100 active:scale-[0.98] transition-all border border-green-200 cursor-pointer"
                     >
                       Audit Files
                     </button>
@@ -286,7 +301,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Loan Underwriting Queue */}
-          <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex flex-col gap-5">
+          <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex flex-col gap-5">
             <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
               📋 Loan Underwriting Queue ({pendingLoans.length})
             </h3>
@@ -345,13 +360,13 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
                       <button 
                         onClick={() => handleReviewLoan(loan.id, 'APPROVED')}
-                        className="flex-1 py-2.5 rounded-xl bg-accent text-primary text-xs font-bold border border-green-200 hover:bg-green-100 transition-all"
+                        className="flex-1 py-2.5 rounded-xl bg-accent text-primary text-xs font-bold border border-green-200 hover:bg-green-100 active:scale-[0.98] transition-all cursor-pointer"
                       >
                         Approve Loan
                       </button>
                       <button 
                         onClick={() => handleReviewLoan(loan.id, 'REJECTED')}
-                        className="flex-1 py-2.5 rounded-xl bg-red-50 text-danger text-xs font-bold border border-red-200 hover:bg-red-100 transition-all"
+                        className="flex-1 py-2.5 rounded-xl bg-red-50 text-danger text-xs font-bold border border-red-200 hover:bg-red-100 active:scale-[0.98] transition-all cursor-pointer"
                       >
                         Reject Request
                       </button>
@@ -362,6 +377,167 @@ export const AdminDashboard: React.FC = () => {
             )}
           </div>
 
+        </div>
+
+        {/* ─── NEW SECTION: 10 SAMPLE BORROWER PROFILES & SPENDING HABITS ─── */}
+        <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex flex-col gap-6 mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div>
+              <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                👥 Borrower Profiles & Spending Habits ({profiles.length})
+              </h3>
+              <p className="text-slate-500 text-sm mt-0.5">
+                AI financial health scores, credit ratings, and monthly expense habit breakdowns.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-accent text-primary border border-green-200 rounded-full text-xs font-bold uppercase self-start">
+              10 Sample Profiles Pre-loaded
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {profiles.map((prof) => {
+              const isExpanded = expandedProfileId === prof.id;
+
+              return (
+                <div 
+                  key={prof.id} 
+                  className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col gap-4 transition-all hover:border-green-300"
+                >
+                  {/* Top Profile Header */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-accent flex items-center justify-center text-primary text-md font-extrabold">
+                        {prof.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 text-base leading-snug">{prof.name}</h4>
+                        <span className="text-xs font-semibold text-slate-500 block">{prof.occupation}</span>
+                        <span className="text-[11px] text-slate-400 block">{prof.email}</span>
+                      </div>
+                    </div>
+
+                    {/* Risk Badge */}
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                        prof.riskCategory === 'LOW' ? 'bg-green-50 text-[#43A047] border border-green-200' :
+                        prof.riskCategory === 'MEDIUM' ? 'bg-amber-50 text-[#FFB300] border border-amber-200' :
+                        'bg-red-50 text-[#E53935] border border-red-200'
+                      }`}>
+                        {prof.riskCategory} RISK
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold">KYC: {prof.kycStatus}</span>
+                    </div>
+                  </div>
+
+                  {/* Financial Metrics Strip */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Credit Score</span>
+                      <span className="font-extrabold text-primary text-base">{prof.creditScore}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Financial Health</span>
+                      <span className="font-bold text-slate-800 text-sm">{prof.financialHealth}%</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Savings Rate</span>
+                      <span className="font-bold text-slate-800 text-sm">{prof.spendingHabits?.savingsRate || '15%'}</span>
+                    </div>
+                  </div>
+
+                  {/* Spending Habit Badges Bar */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <PieChart size={12} /> Spending Pattern Breakdown
+                    </span>
+
+                    {/* Progress bar visual */}
+                    <div className="w-full h-3.5 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+                      {prof.spendingHabits?.categories?.map((cat: any, idx: number) => (
+                        <div 
+                          key={idx}
+                          style={{ width: `${cat.percentage}%`, backgroundColor: cat.color }}
+                          className="h-full transition-all"
+                          title={`${cat.name}: ${cat.percentage}%`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Spending Legend Tags */}
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {prof.spendingHabits?.categories?.map((cat: any, idx: number) => (
+                        <span 
+                          key={idx} 
+                          className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-700 bg-slate-100 flex items-center gap-1"
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                          {cat.name} ({cat.percentage}%)
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accordion Expand Button */}
+                  <button 
+                    onClick={() => setExpandedProfileId(isExpanded ? null : prof.id)}
+                    className="mt-1 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    {isExpanded ? (
+                      <>Hide Full Details <ChevronUp size={14} /></>
+                    ) : (
+                      <>View Detailed Spending & Loans <ChevronDown size={14} /></>
+                    )}
+                  </button>
+
+                  {/* Expanded Profile Details */}
+                  {isExpanded && (
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/60 text-xs flex flex-col gap-3 mt-2 animate-fadeIn">
+                      <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-3">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Monthly Income</span>
+                          <span className="font-bold text-slate-800 text-sm">₹{prof.spendingHabits?.monthlyIncome?.toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Monthly Expenses</span>
+                          <span className="font-bold text-slate-800 text-sm">₹{prof.spendingHabits?.monthlyExpenses?.toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Aadhaar Card</span>
+                          <span className="font-bold text-slate-700">{prof.aadhaarNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">PAN Card</span>
+                          <span className="font-bold text-slate-700">{prof.panNumber}</span>
+                        </div>
+                      </div>
+
+                      {prof.latestLoan && (
+                        <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Loan Application</span>
+                            <span className="font-black text-primary text-sm">₹{prof.latestLoan.amount} ({prof.latestLoan.tenure} Mos)</span>
+                          </div>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
+                            prof.latestLoan.status === 'APPROVED' ? 'bg-green-100 text-primary' :
+                            prof.latestLoan.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-danger'
+                          }`}>
+                            {prof.latestLoan.status}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="text-[11px] text-slate-600 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 font-medium">
+                        💡 <strong>Spending Habits Persona:</strong> {prof.spendingHabits?.spendingPattern}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })}
+          </div>
         </div>
 
       </div>

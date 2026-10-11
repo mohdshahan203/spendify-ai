@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import KYCPage from './pages/KYCPage';
 import BorrowerDashboard from './pages/BorrowerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import ModelLab from './pages/ModelLab';
 
 // Route guards
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
@@ -65,6 +66,15 @@ export const App: React.FC = () => {
             element={
               <ProtectedRoute allowedRoles={['ADMIN', 'OFFICER']}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/model-lab" 
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'OFFICER']}>
+                <ModelLab />
               </ProtectedRoute>
             } 
           />

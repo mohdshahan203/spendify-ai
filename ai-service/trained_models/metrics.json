@@ -1,0 +1,43 @@
+{
+    "dataset_name": "UCI Default of Credit Card Clients",
+    "test_size": 6000,
+    "train_size": 24000,
+    "models": {
+        "random_forest": {
+            "accuracy": 0.8166666666666667,
+            "precision": 0.6605374823196606,
+            "recall": 0.3519216277317257,
+            "f1_score": 0.4591937069813176,
+            "roc_auc": 0.7726887016775006,
+            "confusion_matrix": [
+                [
+                    4433,
+                    240
+                ],
+                [
+                    860,
+                    467
+                ]
+            ]
+        },
+        "xgboost": {
+            "accuracy": 0.8108333333333333,
+            "precision": 0.626984126984127,
+            "recall": 0.3571966842501884,
+            "f1_score": 0.45511281805088816,
+            "roc_auc": 0.7595966083923243,
+            "confusion_matrix": [
+                [
+                    4391,
+                    282
+                ],
+                [
+                    853,
+                    474
+                ]
+            ]
+        }
+    },
+    "deployed_model": "xgboost",
+    "model_version": "1.0.0"
+}

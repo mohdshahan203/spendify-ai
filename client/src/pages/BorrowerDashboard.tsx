@@ -30,10 +30,17 @@ export const BorrowerDashboard: React.FC = () => {
 
   // Apply loan form
   const [applyAmount, setApplyAmount] = useState('');
-  const [applyPurpose, setApplyPurpose] = useState('Personal Expenses');
   const [applyTenure, setApplyTenure] = useState('12');
-  const [applyIncome, setApplyIncome] = useState('');
-  const [applyExpenses, setApplyExpenses] = useState('');
+  // AI Assessment Features
+  const [limitBal, setLimitBal] = useState('50000');
+  const [sex, setSex] = useState('1');
+  const [education, setEducation] = useState('2');
+  const [marriage, setMarriage] = useState('1');
+  const [age, setAge] = useState('30');
+  
+  const [payHistory, setPayHistory] = useState([0,0,0,0,0,0]);
+  const [billAmts, setBillAmts] = useState([10000, 10000, 10000, 10000, 10000, 10000]);
+  const [payAmts, setPayAmts] = useState([1000, 1000, 1000, 1000, 1000, 1000]);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [recentRestructuring, setRecentRestructuring] = useState<any>(null);
 
@@ -100,7 +107,32 @@ export const BorrowerDashboard: React.FC = () => {
         const response = await api.post('/loans/apply', {
           amount: Number(applyAmount),
           tenureMonths: Number(applyTenure),
-          interestRate: 14.0 // Fixed base interest rate
+          interestRate: 14.0, // Fixed base interest rate
+          features: {
+            limit_bal: Number(limitBal),
+            sex: Number(sex),
+            education: Number(education),
+            marriage: Number(marriage),
+            age: Number(age),
+            pay_0: payHistory[0],
+            pay_2: payHistory[1],
+            pay_3: payHistory[2],
+            pay_4: payHistory[3],
+            pay_5: payHistory[4],
+            pay_6: payHistory[5],
+            bill_amt1: billAmts[0],
+            bill_amt2: billAmts[1],
+            bill_amt3: billAmts[2],
+            bill_amt4: billAmts[3],
+            bill_amt5: billAmts[4],
+            bill_amt6: billAmts[5],
+            pay_amt1: payAmts[0],
+            pay_amt2: payAmts[1],
+            pay_amt3: payAmts[2],
+            pay_amt4: payAmts[3],
+            pay_amt5: payAmts[4],
+            pay_amt6: payAmts[5]
+          }
         });
 
         const { loan, prediction } = response.data;
@@ -113,8 +145,6 @@ export const BorrowerDashboard: React.FC = () => {
           setRecentRestructuring(loan);
         } else {
           setApplyAmount('');
-          setApplyIncome('');
-          setApplyExpenses('');
         }
         
         setLoanState('result');
@@ -425,41 +455,84 @@ export const BorrowerDashboard: React.FC = () => {
                     </select>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-slate-700">What is the loan for?</label>
-                    <input
-                      type="text"
-                      value={applyPurpose}
-                      onChange={(e) => setApplyPurpose(e.target.value)}
-                      required
-                      placeholder="e.g. Purchase seeds, college fees, shop inventory"
-                      className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-bold text-slate-700">Monthly Income (INR)</label>
-                      <input
-                        type="number"
-                        value={applyIncome}
-                        onChange={(e) => setApplyIncome(e.target.value)}
-                        required
-                        placeholder="e.g. 50000"
-                        className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none"
-                      />
+                  <div className="mt-4 p-4 border border-blue-200 bg-blue-50 rounded-2xl flex flex-col gap-4">
+                    <h3 className="font-bold text-blue-900">AI Credit Assessment Data</h3>
+                    <p className="text-xs text-blue-700">The following demographic and 6-month historical data is required to run the real XGBoost ML model.</p>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold">Credit Limit (LIMIT_BAL)</label>
+                        <input type="number" value={limitBal} onChange={e=>setLimitBal(e.target.value)} className="px-3 py-2 rounded-lg border text-sm" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold">Age</label>
+                        <input type="number" value={age} onChange={e=>setAge(e.target.value)} className="px-3 py-2 rounded-lg border text-sm" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold">Gender</label>
+                        <select value={sex} onChange={e=>setSex(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
+                          <option value="1">Male</option>
+                          <option value="2">Female</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold">Education</label>
+                        <select value={education} onChange={e=>setEducation(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
+                          <option value="1">Graduate School</option>
+                          <option value="2">University</option>
+                          <option value="3">High School</option>
+                          <option value="4">Other</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold">Marital Status</label>
+                        <select value={marriage} onChange={e=>setMarriage(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
+                          <option value="1">Married</option>
+                          <option value="2">Single</option>
+                          <option value="3">Other</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-bold text-slate-700">Monthly Expenses (INR)</label>
-                      <input
-                        type="number"
-                        value={applyExpenses}
-                        onChange={(e) => setApplyExpenses(e.target.value)}
-                        required
-                        placeholder="e.g. 30000"
-                        className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none"
-                      />
+                    <div className="overflow-x-auto mt-2">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="text-slate-500">
+                            <th className="pb-2">Month</th>
+                            <th className="pb-2">Status (0=Duly)</th>
+                            <th className="pb-2">Bill Amount</th>
+                            <th className="pb-2">Paid Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[0,1,2,3,4,5].map(i => (
+                            <tr key={i}>
+                              <td className="py-1 font-bold">M-{i+1}</td>
+                              <td className="py-1 pr-2">
+                                <input type="number" value={payHistory[i]} onChange={e => {
+                                  const newH = [...payHistory];
+                                  newH[i] = Number(e.target.value);
+                                  setPayHistory(newH);
+                                }} className="w-full px-2 py-1 border rounded bg-white" />
+                              </td>
+                              <td className="py-1 pr-2">
+                                <input type="number" value={billAmts[i]} onChange={e => {
+                                  const newB = [...billAmts];
+                                  newB[i] = Number(e.target.value);
+                                  setBillAmts(newB);
+                                }} className="w-full px-2 py-1 border rounded bg-white" />
+                              </td>
+                              <td className="py-1">
+                                <input type="number" value={payAmts[i]} onChange={e => {
+                                  const newP = [...payAmts];
+                                  newP[i] = Number(e.target.value);
+                                  setPayAmts(newP);
+                                }} className="w-full px-2 py-1 border rounded bg-white" />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
@@ -534,6 +607,48 @@ export const BorrowerDashboard: React.FC = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* SHAP EXPLANATIONS */}
+                {analysisResult.prediction?.shapExplanation && (
+                  <div className="p-6 rounded-3xl bg-blue-50/50 border border-blue-200 shadow-sm flex flex-col gap-4">
+                    <div className="flex items-center gap-2 text-blue-800 font-bold">
+                      <Sparkles size={18} />
+                      <span>AI Model Explainability (SHAP)</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-2">Here are the top factors that influenced your credit score, based on the XGBoost model analysis of your input data.</p>
+                    <div className="flex flex-col gap-2">
+                      {Object.entries(analysisResult.prediction.shapExplanation)
+                        .sort(([, a]: any, [, b]: any) => Math.abs(b) - Math.abs(a))
+                        .slice(0, 5)
+                        .map(([feature, value]: any) => {
+                          const isPositive = value < 0; // Negative log-odds means LOWER default risk -> POSITIVE for score
+                          return (
+                            <div key={feature} className="flex flex-col gap-1">
+                              <div className="flex justify-between text-xs font-bold">
+                                <span className="text-slate-700 capitalize">{feature.replace(/_/g, ' ')}</span>
+                                <span className={isPositive ? 'text-green-600' : 'text-red-600'}>
+                                  {isPositive ? '+' : '-'}{Math.abs(value).toFixed(2)} impact
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden flex">
+                                {isPositive ? (
+                                  <>
+                                    <div className="w-1/2" />
+                                    <div className="bg-green-500 h-full" style={{ width: `${Math.min(50, Math.abs(value) * 10)}%` }} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="bg-red-500 h-full ml-auto" style={{ width: `${Math.min(50, Math.abs(value) * 10)}%` }} />
+                                    <div className="w-1/2" />
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Restructuring Recommendation Modal card if risky */}
                 {recentRestructuring && recentRestructuring.recommendation && (

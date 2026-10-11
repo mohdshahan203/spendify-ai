@@ -47,6 +47,7 @@ export const register = async (req: Request, res: Response) => {
       await dbService.kycDocument.upsert({
         where: { userId: user.id },
         create: {
+          userId: user.id,
           aadhaarNumber: '',
           aadhaarUrl: '',
           panNumber: '',

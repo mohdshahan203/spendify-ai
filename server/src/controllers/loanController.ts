@@ -30,7 +30,7 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
       });
     }
 
-    const { amount, tenureMonths, interestRate } = req.body;
+    const { amount, tenureMonths, interestRate, features } = req.body;
     if (!amount || !tenureMonths || !interestRate) {
       return res.status(400).json({ error: 'Missing loan fields (amount, tenureMonths, interestRate).' });
     }
@@ -54,13 +54,23 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
     try {
       // Proxying the bank statement data from KYC to the ML service
       // We pass the bank statement path and requested loan info
+      const { features } = req.body;
       const response = await axios.post(`${ML_SERVICE_URL}/api/ml/predict`, {
         userId,
-        bankStatementUrl: kyc.bankStatementUrl,
         loanAmount: Number(amount),
         tenureMonths: Number(tenureMonths),
         interestRate: Number(interestRate),
-        emi: monthlyEmi
+        emi: monthlyEmi,
+        features: features || {
+          limit_bal: Number(amount) * 2,
+          sex: 1,
+          education: 2,
+          marriage: 1,
+          age: 30,
+          pay_0: 0, pay_2: 0, pay_3: 0, pay_4: 0, pay_5: 0, pay_6: 0,
+          bill_amt1: 10000, bill_amt2: 10000, bill_amt3: 10000, bill_amt4: 10000, bill_amt5: 10000, bill_amt6: 10000,
+          pay_amt1: 1000, pay_amt2: 1000, pay_amt3: 1000, pay_amt4: 1000, pay_amt5: 1000, pay_amt6: 1000
+        }
       });
       aiResponse = response.data;
     } catch (mlError) {
@@ -110,6 +120,10 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
     }
 
     // Save prediction in DB
+    const serializedShap = typeof aiResponse.shapExplanation === 'object'
+      ? JSON.stringify(aiResponse.shapExplanation)
+      : (aiResponse.shapExplanation || '{}');
+
     const prediction = await dbService.aiPrediction.create({
       data: {
         loanId: loan.id,
@@ -117,7 +131,7 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
         financialHealth: aiResponse.financialHealth,
         defaultProbability: aiResponse.defaultProbability,
         riskCategory: aiResponse.riskCategory,
-        shapExplanation: aiResponse.shapExplanation,
+        shapExplanation: serializedShap,
         recommendationNote: aiResponse.recommendation?.rationale || null
       }
     });
@@ -150,6 +164,12 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
         ...loan,
         prediction,
         recommendation
+      },
+      prediction: {
+        ...prediction,
+        shapExplanation: typeof aiResponse.shapExplanation === 'object'
+          ? aiResponse.shapExplanation
+          : JSON.parse(serializedShap)
       }
     });
   } catch (error: any) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { KYCDocument, Loan } from '@shared/types';
@@ -17,6 +18,7 @@ import {
 
 export const AdminDashboard: React.FC = () => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   
   // States
   const [pendingKycs, setPendingKycs] = useState<KYCDocument[]>([]);
@@ -111,12 +113,20 @@ export const AdminDashboard: React.FC = () => {
             Admin Console
           </span>
         </div>
-        <button 
-          onClick={logout} 
-          className="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all font-bold text-slate-700 cursor-pointer"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/model-lab')} 
+            className="text-xs px-4 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-[0.98] transition-all font-bold cursor-pointer flex items-center gap-1.5"
+          >
+            📊 Model Lab
+          </button>
+          <button 
+            onClick={logout} 
+            className="text-xs px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all font-bold text-slate-700 cursor-pointer"
+          >
+            Sign Out
+          </button>
+        </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 mt-8 flex flex-col gap-8">

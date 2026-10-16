@@ -31,15 +31,19 @@ router.post(
 router.get('/kyc', authenticateJWT, kycController.getKYC);
 
 // --- LOAN ROUTES (Protected) ---
+router.post('/loans/calculate', loanController.calculateLoan);
+router.post('/loans/affordability-suggestions', authenticateJWT, loanController.getAffordabilitySuggestions);
+router.get('/loans/repayments', authenticateJWT, loanController.getRepayments);
 router.post('/loans/apply', authenticateJWT, authorizeRoles('BORROWER'), loanController.applyForLoan);
 router.get('/loans/history', authenticateJWT, authorizeRoles('BORROWER'), loanController.getLoanHistory);
-router.post('/loans/pay-emi', authenticateJWT, authorizeRoles('BORROWER'), loanController.payEMI);
+router.post('/loans/pay-emi', authenticateJWT, authorizeRoles('BORROWER', 'OFFICER', 'ADMIN'), loanController.payEMI);
 
 // --- ALERTS ROUTES (Protected, Borrower & Officer/Admin) ---
 router.get('/alerts', authenticateJWT, alertController.getAlerts);
 router.post('/alerts/resolve', authenticateJWT, alertController.resolveAlert);
 
 // --- AI FINANCIAL ADVISOR (Chatbot) ---
+router.get('/advisor/status', authenticateJWT, advisorController.getAdvisorStatus);
 router.get('/advisor/history', authenticateJWT, advisorController.getChatHistory);
 router.post('/advisor/message', authenticateJWT, advisorController.sendMessage);
 

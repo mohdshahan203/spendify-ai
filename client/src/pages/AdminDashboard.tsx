@@ -133,52 +133,102 @@ export const AdminDashboard: React.FC = () => {
         
         {/* Core Stats Section */}
         {stats && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            
-            {/* Total Borrowers */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center text-primary">
-                <Users size={22} />
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              
+              {/* Total Borrowers */}
+              <div className="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-primary shrink-0">
+                  <Users size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Borrowers</span>
+                  <span className="text-xl font-extrabold text-slate-900">{stats.totalBorrowers}</span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Borrowers</span>
-                <span className="text-2xl font-extrabold text-slate-900">{stats.totalBorrowers}</span>
+
+              {/* Disbursed Volume */}
+              <div className="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] flex items-center justify-center text-[#43A047] shrink-0">
+                  <Landmark size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Disbursed</span>
+                  <span className="text-xl font-extrabold text-slate-900">₹{(stats.loanStats?.totalDisbursed || stats.loanStats?.totalVolume || 0).toLocaleString()}</span>
+                </div>
               </div>
+
+              {/* Outstanding Active Principal */}
+              <div className="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <Landmark size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Active Book</span>
+                  <span className="text-xl font-extrabold text-slate-900">₹{(stats.loanStats?.activeVolume || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Repayments Collected */}
+              <div className="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 shrink-0">
+                  <CheckCircle size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Repayments</span>
+                  <span className="text-xl font-extrabold text-slate-900">₹{(stats.loanStats?.totalRepaymentsCollected || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Overdue Count */}
+              <div className="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                  <FileCheck size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Overdue EMIs</span>
+                  <span className={`text-xl font-extrabold ${stats.loanStats?.overdueCount > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                    {stats.loanStats?.overdueCount || 0}
+                  </span>
+                </div>
+              </div>
+
+              {/* High-risk Alerts */}
+              <div className="p-5 rounded-2xl bg-red-50/50 border border-red-100 shadow-xs flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-[#E53935] shrink-0">
+                  <ShieldAlert size={20} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">High Risk</span>
+                  <span className="text-xl font-extrabold text-red-600">{stats.highRiskBorrowers?.length || 0}</span>
+                </div>
+              </div>
+
             </div>
 
-            {/* Total Volume */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] flex items-center justify-center text-[#43A047]">
-                <Landmark size={22} />
+            {/* Risk Distribution Bar */}
+            {stats.riskDistribution && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 font-bold text-slate-700">
+                  <PieChart size={16} className="text-primary" />
+                  <span>Portfolio AI Risk Distribution:</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-green-100 text-[#2E7D32] font-extrabold border border-green-200">
+                    LOW: {stats.riskDistribution.LOW || 0}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-extrabold border border-blue-200">
+                    MEDIUM: {stats.riskDistribution.MEDIUM || 0}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-extrabold border border-amber-200">
+                    HIGH: {stats.riskDistribution.HIGH || 0}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-extrabold border border-red-200">
+                    CRITICAL: {stats.riskDistribution.CRITICAL || 0}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Disbursed Volume</span>
-                <span className="text-2xl font-extrabold text-slate-900">₹{stats.loanStats.totalVolume.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Approvals */}
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] flex items-center justify-center text-[#43A047]">
-                <FileCheck size={22} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Approved Loans</span>
-                <span className="text-2xl font-extrabold text-slate-900">{stats.loanStats.approved}</span>
-              </div>
-            </div>
-
-            {/* High-risk Alerts */}
-            <div className="p-6 rounded-3xl bg-red-50/50 border border-red-100 shadow-xs flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-[#E53935]">
-                <ShieldAlert size={22} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">High Risk Alerts</span>
-                <span className="text-2xl font-extrabold text-slate-900">{stats.highRiskBorrowers.length}</span>
-              </div>
-            </div>
-
+            )}
           </div>
         )}
 
@@ -548,6 +598,78 @@ export const AdminDashboard: React.FC = () => {
               );
             })}
           </div>
+        </div>
+
+        {/* ─── AUDIT TRAIL & SYSTEM COMPLIANCE LOGS ─── */}
+        <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-xs flex flex-col gap-5 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                🛡️ Administrative Audit Trail & Compliance Log
+              </h3>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Cryptographically tracked administrative events, KYC certifications, and underwriting actions.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-slate-200/80 text-slate-700 rounded-full text-xs font-bold uppercase">
+              {stats?.auditLogs?.length || 0} Events Recorded
+            </span>
+          </div>
+
+          {(!stats?.auditLogs || stats.auditLogs.length === 0) ? (
+            <div className="text-center py-8 text-slate-400 text-sm font-medium">
+              No recent administrative actions recorded. Actions will appear here as approvals or rejections occur.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px]">
+                    <th className="py-3 px-4">Action</th>
+                    <th className="py-3 px-4">Actor ID</th>
+                    <th className="py-3 px-4">Details</th>
+                    <th className="py-3 px-4 text-right">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stats.auditLogs.map((log: any, idx: number) => {
+                    let parsedDetails: any = null;
+                    try {
+                      parsedDetails = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                    } catch {
+                      parsedDetails = { raw: log.details };
+                    }
+
+                    return (
+                      <tr key={log.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                            log.action.includes('APPROVED') ? 'bg-green-100 text-[#2E7D32]' :
+                            log.action.includes('REJECTED') ? 'bg-red-100 text-red-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                          {log.userId ? log.userId.slice(0, 12) + '...' : 'SYSTEM_AUTOMATION'}
+                        </td>
+                        <td className="py-3 px-4 text-slate-700 max-w-md truncate">
+                          {parsedDetails?.notes ? `Notes: "${parsedDetails.notes}" ` : ''}
+                          {parsedDetails?.targetUserId ? `User: ${parsedDetails.targetUserId.slice(0, 8)} ` : ''}
+                          {parsedDetails?.amount ? `Amount: ₹${parsedDetails.amount} ` : ''}
+                          {!parsedDetails?.notes && !parsedDetails?.targetUserId && !parsedDetails?.amount ? JSON.stringify(parsedDetails) : ''}
+                        </td>
+                        <td className="py-3 px-4 text-right text-slate-400 font-medium text-[11px]">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
       </div>

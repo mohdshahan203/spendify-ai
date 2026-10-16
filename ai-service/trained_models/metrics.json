@@ -1,43 +1,74 @@
 {
     "dataset_name": "UCI Default of Credit Card Clients",
-    "test_size": 6000,
+    "dataset_citation": "Yeh, I. C., & Lien, C. H. (2009). The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. Expert Systems with Applications, 36(2), 2473-2480.",
+    "target_variable": "default (0 = Non-default next month, 1 = Default next month)",
     "train_size": 24000,
+    "test_size": 6000,
+    "imbalance_ratio": 3.52,
+    "model_version": "2.0.0",
+    "deployed_model": "xgboost",
+    "selection_rationale": "XGBoost selected based on superior ROC-AUC and balanced recall under class-weighted loss, while Random Forest is retained as benchmark.",
+    "training_timestamp": "2026-10-16T05:38:24.297320+00:00",
+    "dataset_limitations": "The UCI Credit Card Default dataset represents revolving consumer credit card customers in Taiwan (April-September 2005). It captures historical billing and repayment delay trends, but does not contain real-time Indian UPI transaction telemetry, bank statement salary credits, or GST filings. In SpendiFy, this ML model scores behavioral credit risk from repayment track records, while monthly income, living expenses, and liquid surplus are deterministically evaluated by the SpendiFy Affordability Engine.",
+    "feature_descriptions": {
+        "LIMIT_BAL": "Amount of given credit in NT dollars (individual and family/supplementary)",
+        "SEX": "Gender (1 = male, 2 = female)",
+        "EDUCATION": "Education level (1 = graduate school, 2 = university, 3 = high school, 4 = others)",
+        "MARRIAGE": "Marital status (1 = married, 2 = single, 3 = others)",
+        "AGE": "Age in years",
+        "PAY_0": "Repayment status in September (-1 = pay duly, 1 = delay 1 mo, 2 = delay 2 mos, etc.)",
+        "PAY_2": "Repayment status in August",
+        "PAY_3": "Repayment status in July",
+        "PAY_4": "Repayment status in June",
+        "PAY_5": "Repayment status in May",
+        "PAY_6": "Repayment status in April",
+        "BILL_AMT1": "Amount of bill statement in September (NT dollar)",
+        "BILL_AMT2": "Amount of bill statement in August",
+        "BILL_AMT3": "Amount of bill statement in July",
+        "BILL_AMT4": "Amount of bill statement in June",
+        "BILL_AMT5": "Amount of bill statement in May",
+        "BILL_AMT6": "Amount of bill statement in April",
+        "PAY_AMT1": "Amount of previous payment in September (NT dollar)",
+        "PAY_AMT2": "Amount of previous payment in August",
+        "PAY_AMT3": "Amount of previous payment in July",
+        "PAY_AMT4": "Amount of previous payment in June",
+        "PAY_AMT5": "Amount of previous payment in May",
+        "PAY_AMT6": "Amount of previous payment in April"
+    },
     "models": {
         "random_forest": {
-            "accuracy": 0.8166666666666667,
-            "precision": 0.6605374823196606,
-            "recall": 0.3519216277317257,
-            "f1_score": 0.4591937069813176,
-            "roc_auc": 0.7726887016775006,
+            "accuracy": 0.7811666666666667,
+            "precision": 0.5044699872286079,
+            "recall": 0.5953278070836473,
+            "f1_score": 0.5461458693397857,
+            "roc_auc": 0.7752666434556224,
             "confusion_matrix": [
                 [
-                    4433,
-                    240
+                    3897,
+                    776
                 ],
                 [
-                    860,
-                    467
+                    537,
+                    790
                 ]
             ]
         },
         "xgboost": {
-            "accuracy": 0.8108333333333333,
-            "precision": 0.626984126984127,
-            "recall": 0.3571966842501884,
-            "f1_score": 0.45511281805088816,
-            "roc_auc": 0.7595966083923243,
+            "accuracy": 0.7641666666666667,
+            "precision": 0.47435897435897434,
+            "recall": 0.613413715146948,
+            "f1_score": 0.5349983568846532,
+            "roc_auc": 0.7767712222614449,
             "confusion_matrix": [
                 [
-                    4391,
-                    282
+                    3771,
+                    902
                 ],
                 [
-                    853,
-                    474
+                    513,
+                    814
                 ]
             ]
         }
-    },
-    "deployed_model": "xgboost",
-    "model_version": "1.0.0"
+    }
 }

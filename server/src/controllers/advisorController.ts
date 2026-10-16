@@ -1,9 +1,19 @@
 import { Response } from 'express';
-import axios from 'axios';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { dbService } from '../services/dbService';
+import { geminiService, UserFinancialContext } from '../services/geminiService';
+import { SAMPLE_PROFILES_DATA } from '../config/db';
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+export const getAdvisorStatus = async (req: AuthenticatedRequest, res: Response) => {
+  res.status(200).json({
+    configured: geminiService.isConfigured(),
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    provider: 'Google GenAI SDK (@google/genai)',
+    instructions: geminiService.isConfigured()
+      ? 'Gemini AI Assistant is fully configured and ready for live financial advisory.'
+      : 'Set GEMINI_API_KEY in server/.env to enable live Gemini AI financial advisory responses.'
+  });
+};
 
 export const getChatHistory = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -28,70 +38,119 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const { message } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: 'Message content is required.' });
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Valid message content is required.' });
     }
 
-    // Save user message
+    // Save user message to history
     await dbService.chatHistory.create({
       data: {
         userId,
-        message,
+        message: message.trim(),
         isBot: false
       }
     });
 
-    // Fetch user profile info and prediction for context
-    const userLoans = await dbService.loan.findMany({ 
-      where: { userId }
-    });
-    const userKyc = await dbService.kycDocument.findUnique({ where: { userId } });
+    // 1. Fetch factual user financial profile
     const userRecord = await dbService.user.findUnique({ where: { id: userId } });
+    const userKyc = await dbService.kycDocument.findUnique({ where: { userId } });
+    const userLoans = await dbService.loan.findMany({ where: { userId } });
+    const userAlerts = await dbService.alert.findMany({ where: { userId } });
 
-    const activeLoan = userLoans.find(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
+    // Match profile from sample dataset or existing DB metadata if available
+    const matchedProfile = SAMPLE_PROFILES_DATA.find(p => p.email === userRecord?.email);
+
+    const activeLoans = userLoans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
+    const primaryActiveLoan = activeLoans.length > 0 ? activeLoans[0] : null;
     const latestLoan = userLoans.length > 0 ? userLoans[userLoans.length - 1] : null;
-    const prediction = latestLoan?.prediction;
+    const latestPrediction = latestLoan?.prediction;
 
-    let botReply = '';
+    // Deterministic arithmetic for income, expenses, and surplus
+    const monthlyIncome = matchedProfile?.spendingHabits?.monthlyIncome || 50000;
+    const monthlyExpenses = matchedProfile?.spendingHabits?.monthlyExpenses || 25000;
+    const existingDebtEmis = activeLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
+    const monthlySurplus = monthlyIncome - monthlyExpenses - existingDebtEmis;
+    const savings = matchedProfile ? Math.round(monthlyIncome * 0.35) : 35000;
 
-    // Call ML Python chatbot endpoint
-    try {
-      const response = await axios.post(`${ML_SERVICE_URL}/api/ml/chat`, {
-        userId,
-        message,
-        profile: {
-          name: userRecord?.name || req.user?.email.split('@')[0],
-          kycStatus: userKyc?.status || 'APPROVED',
-          hasActiveLoan: !!activeLoan,
-          activeLoanAmount: activeLoan?.amount || 0,
-          latestLoanStatus: latestLoan?.status || 'APPROVED',
-          creditScore: prediction?.creditScore || 750,
-          financialHealthScore: prediction?.financialHealth || 90,
-          riskCategory: prediction?.riskCategory || 'LOW',
-          defaultProbability: prediction?.defaultProbability || 0.05
-        }
-      });
-      botReply = response.data.reply;
-    } catch (error) {
-      console.warn('⚠️ ML Chatbot service call failed. Synthesizing AI response on Node backend.');
-      
-      const query = message.toLowerCase();
-      const userName = userRecord?.name || 'Borrower';
-      const score = prediction?.creditScore || 750;
-      const risk = prediction?.riskCategory || 'LOW';
+    const creditScore = latestPrediction?.creditScore || matchedProfile?.creditScore || 740;
+    const riskCategory = latestPrediction?.riskCategory || matchedProfile?.riskCategory || 'LOW';
+    const defaultProbability = latestPrediction?.defaultProbability ?? matchedProfile?.defaultProbability ?? 0.08;
+    const financialHealthScore = latestPrediction?.financialHealth || matchedProfile?.financialHealth || 82.0;
 
-      if (query.includes('hello') || query.includes('hi') || query.includes('hey')) {
-        botReply = `Hello ${userName}! 👋 I am **SpendiFy AI**, your financial assistant. Your current Credit Score is **${score}** (${risk} Risk). How can I help you today?`;
-      } else if (query.includes('score') || query.includes('cibil') || query.includes('improve')) {
-        botReply = `### 📊 Credit Score Breakdown for ${userName}\n\nYour current Credit Score is **${score} / 900** (${risk} Risk Tier).\n\n**Tips to Boost Your Score:**\n1. Maintain credit card utilization below 30%.\n2. Ensure zero missed EMI payments for 6 consecutive months.\n3. Keep older credit accounts active to build tenure.`;
-      } else if (query.includes('loan') || query.includes('apply') || query.includes('eligible')) {
-        botReply = `### 💳 Loan Eligibility Guide for ${userName}\n\nWith a credit score of **${score}**, you qualify for instant micro-loans up to **₹50,000** at competitive interest rates (11-13% p.a.). Would you like to submit an application on SpendiFy?`;
-      } else {
-        botReply = `### 🤖 SpendiFy AI Advisory\n\nThanks for reaching out, ${userName}! As your financial guide, I monitor your credit health (Score: **${score}**). Feel free to ask me about loan eligibility, EMI calculators, or score improvement steps!`;
+    const context: UserFinancialContext = {
+      userName: userRecord?.name || req.user?.email.split('@')[0] || 'Borrower',
+      kycStatus: userKyc?.status || 'NOT_STARTED',
+      monthlyIncome,
+      monthlyExpenses,
+      existingDebtEmis,
+      monthlySurplus,
+      savings,
+      creditScore,
+      riskCategory,
+      defaultProbability,
+      financialHealthScore,
+      activeLoan: primaryActiveLoan ? {
+        id: primaryActiveLoan.id,
+        amount: primaryActiveLoan.amount,
+        tenureMonths: primaryActiveLoan.tenureMonths,
+        interestRate: primaryActiveLoan.interestRate,
+        emi: primaryActiveLoan.emi,
+        status: primaryActiveLoan.status,
+        outstandingBalance: primaryActiveLoan.amount, // baseline if not repaid
+        paidInstalments: 0,
+        totalInstalments: primaryActiveLoan.tenureMonths
+      } : null,
+      allLoansSummary: userLoans.length > 0
+        ? userLoans.map(l => `#${l.id.slice(0, 8)} (₹${l.amount}, ${l.tenureMonths}m, ${l.status})`).join('; ')
+        : 'No previous loans on record',
+      spendingBreakdown: matchedProfile?.spendingHabits?.categories || [
+        { name: 'Rent & Living', percentage: 40 },
+        { name: 'Food & Essentials', percentage: 30 },
+        { name: 'Discretionary', percentage: 15 },
+        { name: 'Savings Buffer', percentage: 15 }
+      ]
+    };
+
+    // 2. Fetch past conversation turns
+    const allHistory = await dbService.chatHistory.findMany({ where: { userId } });
+    const conversationTurns = allHistory.slice(-8).map(h => ({
+      role: (h.isBot ? 'model' : 'user') as 'user' | 'model',
+      content: h.message
+    }));
+
+    // 3. Request Gemini advisory response
+    const geminiResult = await geminiService.askAdvisor(message.trim(), context, conversationTurns);
+
+    if (!geminiResult.success) {
+      if (geminiResult.code === 'KEY_MISSING') {
+        const guidanceMsg = `⚠️ **Gemini AI Configuration Notice**\n\nGoogle Gemini AI is selected as your advisory model, but \`GEMINI_API_KEY\` is not yet configured in the server environment.\n\n### How to Activate Live Gemini:\n1. Obtain a free API key at [Google AI Studio](https://aistudio.google.com/)\n2. Open \`server/.env\` and add:\n   \`\`\`bash\n   GEMINI_API_KEY=your_actual_key_here\n   \`\`\`\n3. Restart the server.\n\n*In the meantime, your deterministic calculations (EMI: ₹${primaryActiveLoan?.emi || 'N/A'}, Surplus: ₹${monthlySurplus.toLocaleString('en-IN')}) are fully active across the platform.*`;
+
+        const savedMsg = await dbService.chatHistory.create({
+          data: {
+            userId,
+            message: guidanceMsg,
+            isBot: true
+          }
+        });
+
+        return res.status(200).json({
+          ...savedMsg,
+          configured: false,
+          isConfigNotice: true,
+          setupInstructions: geminiResult.setupInstructions
+        });
       }
+
+      // Live call failure (quota or network error) -> display genuine error
+      return res.status(502).json({
+        error: geminiResult.error,
+        code: geminiResult.code,
+        setupInstructions: geminiResult.setupInstructions
+      });
     }
 
-    // Save bot message
+    // 4. Save genuine Gemini bot reply
+    const botReply = geminiResult.reply || 'No response generated.';
     const savedBotMsg = await dbService.chatHistory.create({
       data: {
         userId,
@@ -100,9 +159,13 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    res.status(200).json(savedBotMsg);
+    res.status(200).json({
+      ...savedBotMsg,
+      configured: true,
+      modelUsed: geminiResult.modelUsed
+    });
   } catch (error: any) {
     console.error('Advisor Chatbot error:', error);
-    res.status(500).json({ error: 'Failed to process chat response.' });
+    res.status(500).json({ error: 'Failed to process chat response: ' + error.message });
   }
 };

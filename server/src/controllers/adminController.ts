@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { dbService } from '../services/dbService';
+import { generateAmortisationSchedule } from '../services/loanMathService';
 
 export const getPendingKYCs = async (req: Request, res: Response) => {
   try {
@@ -15,6 +16,7 @@ export const getPendingKYCs = async (req: Request, res: Response) => {
 export const verifyKYC = async (req: Request, res: Response) => {
   try {
     const { userId, status, notes } = req.body; // status: APPROVED or REJECTED
+    const adminUser = (req as any).user;
 
     if (!userId || !status) {
       return res.status(400).json({ error: 'User ID and status are required.' });
@@ -24,12 +26,30 @@ export const verifyKYC = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Status must be APPROVED or REJECTED.' });
     }
 
+    if (status === 'REJECTED' && (!notes || !notes.trim())) {
+      return res.status(400).json({ error: 'A specific rejection reason must be provided when rejecting KYC.' });
+    }
+
     const updatedKyc = await dbService.kycDocument.update({
       where: { userId },
       data: {
         status,
         verifiedAt: new Date(),
-        verifierNotes: notes || ''
+        verifierNotes: notes || (status === 'APPROVED' ? 'Approved by compliance officer.' : 'Document verification rejected.')
+      }
+    });
+
+    // Audit log
+    await dbService.auditLog.create({
+      data: {
+        userId: adminUser?.id,
+        action: status === 'APPROVED' ? 'VERIFY_KYC_APPROVED' : 'VERIFY_KYC_REJECTED',
+        details: JSON.stringify({
+          targetUserId: userId,
+          status,
+          notes: notes || '',
+          timestamp: new Date().toISOString()
+        })
       }
     });
 
@@ -55,10 +75,16 @@ export const getLoanRequests = async (req: Request, res: Response) => {
 
 export const reviewLoan = async (req: Request, res: Response) => {
   try {
-    const { loanId, status } = req.body; // status: APPROVED or REJECTED
+    const { loanId, status, reviewNotes } = req.body; // status: APPROVED or REJECTED
+    const adminUser = (req as any).user;
 
     if (!loanId || !status) {
       return res.status(400).json({ error: 'Loan ID and status are required.' });
+    }
+
+    const loan = await dbService.loan.findUnique({ where: { id: loanId } });
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan application not found.' });
     }
 
     const updatedLoan = await dbService.loan.update({
@@ -66,17 +92,45 @@ export const reviewLoan = async (req: Request, res: Response) => {
       data: { status }
     });
 
-    // If approved, trigger simulated disburse transaction
+    // If approved, trigger simulated disbursement and ensure repayment schedule exists
     if (status === 'APPROVED') {
       await dbService.transaction.create({
         data: {
           loanId,
           amount: updatedLoan.amount,
           type: 'DISBURSEMENT',
-          status: 'SUCCESS'
+          status: 'SUCCESS',
+          paymentMethod: 'ESCROW_BANK_DISBURSAL (Simulated Demo)'
         }
       });
+
+      // Ensure repayment schedule exists
+      const existingSchedule = await dbService.repaymentSchedule.findMany({ where: { loanId } });
+      if (!existingSchedule || existingSchedule.length === 0) {
+        const quote = generateAmortisationSchedule({
+          amount: updatedLoan.amount,
+          annualRate: updatedLoan.interestRate,
+          tenureMonths: updatedLoan.tenureMonths
+        }, loanId);
+        await dbService.repaymentSchedule.createMany({ data: quote.schedule });
+      }
     }
+
+    // Record audit log
+    await dbService.auditLog.create({
+      data: {
+        userId: adminUser?.id,
+        action: status === 'APPROVED' ? 'LOAN_APPROVED' : 'LOAN_REJECTED',
+        details: JSON.stringify({
+          loanId,
+          borrowerId: loan.userId,
+          amount: loan.amount,
+          status,
+          notes: reviewNotes || '',
+          timestamp: new Date().toISOString()
+        })
+      }
+    });
 
     res.status(200).json({
       message: `Loan application ${status.toLowerCase()} successfully.`,
@@ -92,8 +146,11 @@ export const getAdminStats = async (req: Request, res: Response) => {
   try {
     const loans = await dbService.loan.findMany();
     const users = await dbService.user.findMany();
-    const borrowers = users.filter(u => u.role === 'BORROWER');
+    const transactions = await dbService.transaction.findMany();
+    const repayments = await dbService.repaymentSchedule.findMany();
+    const auditLogs = await dbService.auditLog.findMany();
 
+    const borrowers = users.filter(u => u.role === 'BORROWER');
     const totalBorrowers = borrowers.length;
     const pendingLoans = loans.filter(l => l.status === 'PENDING').length;
     const activeLoans = loans.filter(l => l.status === 'ACTIVE').length;
@@ -102,12 +159,18 @@ export const getAdminStats = async (req: Request, res: Response) => {
 
     // Financial calculations
     const activeVolume = loans
-      .filter(l => l.status === 'ACTIVE')
-      .reduce((sum, l) => sum + l.amount, 0);
+      .filter(l => l.status === 'ACTIVE' || l.status === 'APPROVED')
+      .reduce((sum, l) => sum + (Number(l.outstandingBalance) || Number(l.amount)), 0);
 
-    const totalVolume = loans
-      .filter(l => l.status !== 'REJECTED')
-      .reduce((sum, l) => sum + l.amount, 0);
+    const totalDisbursed = loans
+      .filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE' || l.status === 'PAID')
+      .reduce((sum, l) => sum + Number(l.amount), 0);
+
+    const totalRepaymentsCollected = transactions
+      .filter(t => t.type === 'EMI_PAYMENT' && t.status === 'SUCCESS')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const overdueCount = repayments.filter(r => r.status === 'OVERDUE').length;
 
     // AI Risk Distribution statistics
     const risks = loans.map(l => l.prediction?.riskCategory || 'MEDIUM');
@@ -126,10 +189,13 @@ export const getAdminStats = async (req: Request, res: Response) => {
         active: activeLoans,
         approved: approvedCount,
         rejected: rejectedCount,
-        activeVolume,
-        totalVolume
+        activeVolume: Math.round(activeVolume),
+        totalDisbursed: Math.round(totalDisbursed),
+        totalRepaymentsCollected: Math.round(totalRepaymentsCollected),
+        overdueCount
       },
       riskDistribution,
+      auditLogs: auditLogs.slice(0, 15),
       highRiskBorrowers: loans
         .filter(l => l.prediction?.riskCategory === 'HIGH' || l.prediction?.riskCategory === 'CRITICAL')
         .map(l => ({
@@ -158,10 +224,10 @@ export const getBorrowerProfiles = async (req: Request, res: Response) => {
       const userKyc = kycDocs.find(k => k.userId === b.id);
       const userLoans = loans.filter(l => l.userId === b.id);
       const latestLoan = userLoans.length > 0 ? userLoans[userLoans.length - 1] : null;
-      
+
       let spendingHabits = null;
       let occupation = 'Borrower';
-      
+
       if (latestLoan?.prediction?.shapExplanation) {
         try {
           const exp = typeof latestLoan.prediction.shapExplanation === 'string'
@@ -182,11 +248,13 @@ export const getBorrowerProfiles = async (req: Request, res: Response) => {
         aadhaarNumber: userKyc?.aadhaarNumber || 'N/A',
         panNumber: userKyc?.panNumber || 'N/A',
         latestLoan: latestLoan ? {
+          id: latestLoan.id,
           amount: latestLoan.amount,
           tenure: latestLoan.tenureMonths,
           status: latestLoan.status,
           emi: latestLoan.emi,
-          interestRate: latestLoan.interestRate
+          interestRate: latestLoan.interestRate,
+          outstandingBalance: latestLoan.outstandingBalance || latestLoan.amount
         } : null,
         creditScore: latestLoan?.prediction?.creditScore || 720,
         financialHealth: latestLoan?.prediction?.financialHealth || 80,
@@ -213,4 +281,3 @@ export const getBorrowerProfiles = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to retrieve borrower profiles.' });
   }
 };
-

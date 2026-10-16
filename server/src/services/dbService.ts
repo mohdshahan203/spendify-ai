@@ -430,5 +430,65 @@ export const dbService = {
       mockDb.chats.push(newChat);
       return newChat;
     }
+  },
+
+  // --- REPAYMENT SCHEDULE OPERATIONS ---
+  repaymentSchedule: {
+    findMany: async (args?: { where?: { loanId?: string; loan?: { userId?: string } } }) => {
+      const loanId = args?.where?.loanId;
+      if (loanId) {
+        return mockDb.repayments.filter(r => r.loanId === loanId);
+      }
+      return mockDb.repayments;
+    },
+    findUnique: async (args: { where: { id: string } }) => {
+      return mockDb.repayments.find(r => r.id === args.where.id) || null;
+    },
+    create: async (args: { data: any }) => {
+      const newRepayment = {
+        id: args.data.id || Math.random().toString(36).substring(2, 15),
+        status: 'UPCOMING',
+        createdAt: new Date(),
+        ...args.data
+      };
+      mockDb.repayments.push(newRepayment);
+      return newRepayment;
+    },
+    createMany: async (args: { data: any[] }) => {
+      args.data.forEach(item => {
+        const newRepayment = {
+          id: item.id || Math.random().toString(36).substring(2, 15),
+          status: item.status || 'UPCOMING',
+          createdAt: new Date(),
+          ...item
+        };
+        mockDb.repayments.push(newRepayment);
+      });
+      return { count: args.data.length };
+    },
+    update: async (args: { where: { id: string }; data: any }) => {
+      const idx = mockDb.repayments.findIndex(r => r.id === args.where.id);
+      if (idx !== -1) {
+        mockDb.repayments[idx] = { ...mockDb.repayments[idx], ...args.data };
+        return mockDb.repayments[idx];
+      }
+      throw new Error('Repayment instalment not found');
+    }
+  },
+
+  // --- AUDIT LOG OPERATIONS ---
+  auditLog: {
+    findMany: async () => {
+      return mockDb.auditLogs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    create: async (args: { data: any }) => {
+      const newLog = {
+        id: Math.random().toString(36).substring(2, 15),
+        createdAt: new Date(),
+        ...args.data
+      };
+      mockDb.auditLogs.push(newLog);
+      return newLog;
+    }
   }
 };

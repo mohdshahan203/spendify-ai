@@ -2,71 +2,132 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Loan, Alert as AlertType, ChatMessage, KYCDocument } from '@shared/types';
-import { 
-  Home as HomeIcon, 
-  CreditCard, 
-  MessageSquare, 
-  History as HistoryIcon, 
-  User as UserIcon, 
-  Send, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Sparkles
+import {
+  Loan,
+  Alert as AlertType,
+  ChatMessage,
+  KYCDocument,
+  LoanCalculationResult,
+  LoanScenarioSuggestion,
+  RepaymentScheduleItem
+} from '@shared/types';
+import {
+  Home as HomeIcon,
+  Calculator,
+  Compass,
+  CreditCard,
+  CalendarCheck,
+  MessageSquare,
+  History as HistoryIcon,
+  User as UserIcon,
+  Send,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Download,
+  Check,
+  Receipt,
+  X,
+  RefreshCw,
+  TrendingUp,
+  Percent,
+  Clock,
+  ChevronRight
 } from 'lucide-react';
 
 export const BorrowerDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
-  // Tab switching: 'home' | 'loan' | 'ai' | 'history' | 'profile'
-  const [activeTab, setActiveTab] = useState<'home' | 'loan' | 'ai' | 'history' | 'profile'>('home');
-  
-  // Dashboard states
+
+  // Active navigation tab
+  const [activeTab, setActiveTab] = useState<
+    'home' | 'calculator' | 'suggestions' | 'repayments' | 'loan' | 'ai' | 'history' | 'profile'
+  >('home');
+
+  // Core Data States
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [repaymentLoans, setRepaymentLoans] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [kyc, setKyc] = useState<KYCDocument | null>(null);
+  const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; model: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Apply loan form
-  const [applyAmount, setApplyAmount] = useState('');
+  // --- PHASE 4: LOAN CALCULATOR STATE ---
+  const [calcAmount, setCalcAmount] = useState<number>(50000);
+  const [calcRate, setCalcRate] = useState<number>(13.5);
+  const [calcTenure, setCalcTenure] = useState<number>(12);
+  const [calcFeePercent, setCalcFeePercent] = useState<number>(1.5);
+  const [calcResult, setCalcResult] = useState<LoanCalculationResult | null>(null);
+  const [showAmortTable, setShowAmortTable] = useState(false);
+
+  // --- PHASE 5: AFFORDABILITY & SUGGESTIONS STATE ---
+  const [affordAmount, setAffordAmount] = useState<number>(50000);
+  const [affordTenure, setAffordTenure] = useState<number>(12);
+  const [affordRate, setAffordRate] = useState<number>(13.5);
+  const [customIncome, setCustomIncome] = useState<string>('');
+  const [customExpenses, setCustomExpenses] = useState<string>('');
+  const [customDebt, setCustomDebt] = useState<string>('');
+  const [affordData, setAffordData] = useState<any>(null);
+  const [loadingAfford, setLoadingAfford] = useState(false);
+  const [geminiAffordExplain, setGeminiAffordExplain] = useState<string | null>(null);
+  const [explainingWithAI, setExplainingWithAI] = useState(false);
+
+  // --- PHASE 7: REPAYMENTS & PAYMENT MODAL STATE ---
+  const [selectedRepaymentLoan, setSelectedRepaymentLoan] = useState<any>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentTargetInstalment, setPaymentTargetInstalment] = useState<RepaymentScheduleItem | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'SIMULATED_UPI' | 'NET_BANKING' | 'DEBIT_CARD'>('SIMULATED_UPI');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState<any>(null);
+  const [paymentSuccessModal, setPaymentSuccessModal] = useState(false);
+
+  // --- LOAN APPLICATION STATE ---
+  const [applyAmount, setApplyAmount] = useState('50000');
   const [applyTenure, setApplyTenure] = useState('12');
-  // AI Assessment Features
   const [limitBal, setLimitBal] = useState('50000');
   const [sex, setSex] = useState('1');
   const [education, setEducation] = useState('2');
   const [marriage, setMarriage] = useState('1');
   const [age, setAge] = useState('30');
-  
-  const [payHistory, setPayHistory] = useState([0,0,0,0,0,0]);
-  const [billAmts, setBillAmts] = useState([10000, 10000, 10000, 10000, 10000, 10000]);
-  const [payAmts, setPayAmts] = useState([1000, 1000, 1000, 1000, 1000, 1000]);
+  const [payHistory, setPayHistory] = useState([0, 0, 0, 0, 0, 0]);
+  const [billAmts, setBillAmts] = useState([12000, 11000, 10000, 9500, 8000, 7500]);
+  const [payAmts, setPayAmts] = useState([1500, 1500, 1500, 1500, 1500, 1500]);
   const [applyError, setApplyError] = useState<string | null>(null);
-  const [recentRestructuring, setRecentRestructuring] = useState<any>(null);
-
-  // Loan Application State: 'form' | 'analyzing' | 'result'
   const [loanState, setLoanState] = useState<'form' | 'analyzing' | 'result'>('form');
   const [analysisResult, setAnalysisResult] = useState<any>(null);
 
-  // Chatbot states
+  // --- PHASE 2: CHATBOT STATE ---
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userMsg, setUserMsg] = useState('');
   const [sendingChat, setSendingChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch all initial data
   const fetchDashboardData = async () => {
     try {
-      const kycRes = await api.get('/kyc');
+      const [kycRes, loansRes, alertsRes, chatRes, repaymentsRes, geminiRes] = await Promise.all([
+        api.get('/kyc').catch(() => ({ data: null })),
+        api.get('/loans/history').catch(() => ({ data: [] })),
+        api.get('/alerts').catch(() => ({ data: [] })),
+        api.get('/advisor/history').catch(() => ({ data: [] })),
+        api.get('/loans/repayments').catch(() => ({ data: [] })),
+        api.get('/advisor/status').catch(() => ({ data: { configured: false, model: 'gemini-2.5-flash' } }))
+      ]);
+
       setKyc(kycRes.data);
-      
-      const loansRes = await api.get('/loans/history');
       setLoans(loansRes.data);
-
-      const alertsRes = await api.get('/alerts');
       setAlerts(alertsRes.data);
-
-      const chatRes = await api.get('/advisor/history');
       setChatMessages(chatRes.data);
+      setRepaymentLoans(repaymentsRes.data);
+      setGeminiStatus(geminiRes.data);
+
+      if (repaymentsRes.data.length > 0) {
+        setSelectedRepaymentLoan(repaymentsRes.data[0]);
+      }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -78,21 +139,66 @@ export const BorrowerDashboard: React.FC = () => {
     fetchDashboardData();
   }, []);
 
+  // Update Calculator on input changes
+  useEffect(() => {
+    const runCalculator = async () => {
+      try {
+        const res = await api.post('/loans/calculate', {
+          amount: calcAmount,
+          annualRate: calcRate,
+          tenureMonths: calcTenure,
+          processingFeePercent: calcFeePercent
+        });
+        setCalcResult(res.data);
+      } catch (err) {
+        console.error('Calculator error:', err);
+      }
+    };
+    runCalculator();
+  }, [calcAmount, calcRate, calcTenure, calcFeePercent]);
+
+  // Run Affordability Evaluation
+  const runAffordabilityCheck = async (askGemini: boolean = false) => {
+    setLoadingAfford(true);
+    if (askGemini) setExplainingWithAI(true);
+    try {
+      const res = await api.post('/loans/affordability-suggestions', {
+        requestedAmount: affordAmount,
+        requestedTenure: affordTenure,
+        baseRate: affordRate,
+        customIncome: customIncome ? Number(customIncome) : undefined,
+        customExpenses: customExpenses ? Number(customExpenses) : undefined,
+        customExistingEmis: customDebt ? Number(customDebt) : undefined,
+        askAI: askGemini
+      });
+      setAffordData(res.data);
+      if (res.data.aiExplanation) {
+        setGeminiAffordExplain(res.data.aiExplanation);
+      }
+    } catch (err) {
+      console.error('Affordability evaluation error:', err);
+    } finally {
+      setLoadingAfford(false);
+      setExplainingWithAI(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'suggestions') {
+      runAffordabilityCheck(false);
+    }
+  }, [activeTab, affordAmount, affordTenure, affordRate]);
+
   useEffect(() => {
     if (activeTab === 'ai') {
-      scrollToBottom();
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, activeTab]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
 
   // Submit loan application
   const handleApplyLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     setApplyError(null);
-    setRecentRestructuring(null);
 
     if (kyc?.status !== 'APPROVED') {
       setApplyError(kyc?.status === 'PENDING' ? 'Your verification is under review.' : 'Please upload your KYC documents first.');
@@ -101,92 +207,60 @@ export const BorrowerDashboard: React.FC = () => {
 
     setLoanState('analyzing');
 
-    // Simulate 3 seconds AI processing delay for beautiful loading animation
-    setTimeout(async () => {
-      try {
-        const response = await api.post('/loans/apply', {
-          amount: Number(applyAmount),
-          tenureMonths: Number(applyTenure),
-          interestRate: 14.0, // Fixed base interest rate
-          features: {
-            limit_bal: Number(limitBal),
-            sex: Number(sex),
-            education: Number(education),
-            marriage: Number(marriage),
-            age: Number(age),
-            pay_0: payHistory[0],
-            pay_2: payHistory[1],
-            pay_3: payHistory[2],
-            pay_4: payHistory[3],
-            pay_5: payHistory[4],
-            pay_6: payHistory[5],
-            bill_amt1: billAmts[0],
-            bill_amt2: billAmts[1],
-            bill_amt3: billAmts[2],
-            bill_amt4: billAmts[3],
-            bill_amt5: billAmts[4],
-            bill_amt6: billAmts[5],
-            pay_amt1: payAmts[0],
-            pay_amt2: payAmts[1],
-            pay_amt3: payAmts[2],
-            pay_amt4: payAmts[3],
-            pay_amt5: payAmts[4],
-            pay_amt6: payAmts[5]
-          }
-        });
-
-        const { loan, prediction } = response.data;
-        setAnalysisResult({
-          loan,
-          prediction
-        });
-
-        if (loan.recommendation) {
-          setRecentRestructuring(loan);
-        } else {
-          setApplyAmount('');
-        }
-        
-        setLoanState('result');
-        fetchDashboardData();
-      } catch (err: any) {
-        setApplyError(err.response?.data?.error || 'Failed to submit loan application.');
-        setLoanState('form');
-      }
-    }, 3000);
-  };
-
-  // Accept loan restructure suggestion
-  const handleAcceptRestructure = async () => {
-    if (!recentRestructuring || !recentRestructuring.recommendation) return;
     try {
-      const rec = recentRestructuring.recommendation;
-      await api.post('/loans/apply', {
-        amount: rec.suggestedAmount,
-        tenureMonths: rec.suggestedTenure,
-        interestRate: rec.suggestedRate
+      const response = await api.post('/loans/apply', {
+        amount: Number(applyAmount),
+        tenureMonths: Number(applyTenure),
+        interestRate: 13.5,
+        features: {
+          limit_bal: Number(limitBal),
+          sex: Number(sex),
+          education: Number(education),
+          marriage: Number(marriage),
+          age: Number(age),
+          pay_0: payHistory[0],
+          pay_2: payHistory[1],
+          pay_3: payHistory[2],
+          pay_4: payHistory[3],
+          pay_5: payHistory[4],
+          pay_6: payHistory[5],
+          bill_amt1: billAmts[0],
+          bill_amt2: billAmts[1],
+          bill_amt3: billAmts[2],
+          bill_amt4: billAmts[3],
+          bill_amt5: billAmts[4],
+          bill_amt6: billAmts[5],
+          pay_amt1: payAmts[0],
+          pay_amt2: payAmts[1],
+          pay_amt3: payAmts[2],
+          pay_amt4: payAmts[3],
+          pay_amt5: payAmts[4],
+          pay_amt6: payAmts[5]
+        }
       });
-      alert('Suggested loan offer accepted and applied successfully!');
-      setRecentRestructuring(null);
-      setLoanState('form');
+
+      const { loan, quote } = response.data;
+      setAnalysisResult({
+        loan,
+        prediction: loan.prediction,
+        quote
+      });
+      setLoanState('result');
       fetchDashboardData();
-    } catch (err) {
-      alert('Failed to accept restructure offer.');
+    } catch (err: any) {
+      setApplyError(err.response?.data?.message || err.response?.data?.error || 'Failed to submit loan application.');
+      setLoanState('form');
     }
   };
 
   // Chat message send
-  const handleSendChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userMsg.trim()) return;
-
-    await sendChatToApi(userMsg);
-  };
-
   const sendChatToApi = async (messageText: string) => {
-    setSendingChat(true);
+    if (!messageText.trim() || sendingChat) return;
 
-    // Optimistically update user message bubble
+    setUserMsg('');
+    setSendingChat(true);
+    setChatError(null);
+
     const tempUserMsg: ChatMessage = {
       id: Math.random().toString(),
       userId: user?.id || '',
@@ -195,16 +269,17 @@ export const BorrowerDashboard: React.FC = () => {
       createdAt: new Date().toISOString()
     };
     setChatMessages(prev => [...prev, tempUserMsg]);
-    setUserMsg('');
 
     try {
       const response = await api.post('/advisor/message', { message: messageText });
       setChatMessages(prev => [...prev, response.data]);
-    } catch (err) {
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || err.message || 'Connection error with Gemini service.';
+      setChatError(errorMsg);
       const tempBotError: ChatMessage = {
         id: Math.random().toString(),
         userId: user?.id || '',
-        message: "I am having a small connection issue. Please ask again in a moment.",
+        message: `⚠️ **Advisory Notice**: ${errorMsg}`,
         isBot: true,
         createdAt: new Date().toISOString()
       };
@@ -214,333 +289,948 @@ export const BorrowerDashboard: React.FC = () => {
     }
   };
 
-  const activeLoan = loans.find(l => l.status === 'ACTIVE');
+  // Handle Payment Submit
+  const handleExecutePayment = async () => {
+    if (!selectedRepaymentLoan || isProcessingPayment) return;
+    setIsProcessingPayment(true);
+
+    try {
+      const emiToPay = paymentTargetInstalment?.emiAmount || selectedRepaymentLoan.nextDueAmount || selectedRepaymentLoan.emi;
+      const res = await api.post('/loans/pay-emi', {
+        loanId: selectedRepaymentLoan.id,
+        instalmentId: paymentTargetInstalment?.id,
+        amount: emiToPay,
+        paymentMethod
+      });
+
+      setPaymentReceipt(res.data.receipt);
+      setPaymentModalOpen(false);
+      setPaymentSuccessModal(true);
+      fetchDashboardData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Payment failed to process');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Resolve Alert
+  const handleResolveAlert = async (alertId: string) => {
+    try {
+      await api.post('/alerts/resolve', { alertId });
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, resolved: true } : a));
+    } catch (err) {
+      console.error('Failed to resolve alert:', err);
+    }
+  };
+
+  const activeLoan = loans.find(l => l.status === 'ACTIVE' || l.status === 'APPROVED');
   const latestLoan = loans.length > 0 ? loans[loans.length - 1] : null;
-
-  // Translate labels to plain English
-  const getRepaymentChanceText = (prob: number) => {
-    const chance = (1.0 - prob) * 100;
-    if (chance > 85) return 'Very High';
-    if (chance > 70) return 'High';
-    if (chance > 50) return 'Medium';
-    return 'Low';
-  };
-
-  const getRepaymentChanceColor = (prob: number) => {
-    const chance = (1.0 - prob) * 100;
-    if (chance > 70) return 'text-[#43A047]';
-    if (chance > 50) return 'text-[#FFB300]';
-    return 'text-[#E53935]';
-  };
-
-  const getEligibilityText = (risk: string) => {
-    if (risk === 'LOW') return 'Fully Eligible (Excellent)';
-    if (risk === 'MEDIUM') return 'Eligible with Standard Terms';
-    if (risk === 'HIGH') return 'Restricted Eligibility (High risk)';
-    if (risk === 'CRITICAL') return 'Not Eligible';
-    return 'Pending Evaluation';
-  };
-
-  const getEligibilityBg = (risk: string) => {
-    if (risk === 'LOW') return 'bg-green-50 text-[#43A047] border border-green-200';
-    if (risk === 'MEDIUM') return 'bg-blue-50 text-blue-600 border border-blue-200';
-    return 'bg-red-50 text-[#E53935] border border-red-200';
-  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-slate-500 font-medium">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-        Securing connection...
+      <div className="min-h-screen bg-[#07090E] flex flex-col items-center justify-center text-slate-400 font-sans">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <span className="text-sm tracking-wide font-medium">Securing session and live telemetry...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 pb-24 relative">
-      
-      {/* Top Simple Banner */}
-      <nav className="w-full px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-30 flex items-center justify-between">
-        <span className="text-2xl font-extrabold text-primary">SpendiFy</span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-slate-600">Hello, {user?.name.split(' ')[0]} 👋</span>
+    <div className="min-h-screen bg-[#07090E] text-slate-100 pb-28 font-sans selection:bg-emerald-500 selection:text-black">
+
+      {/* Top Professional Navigation Bar */}
+      <header className="w-full px-6 py-4 border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur-xl sticky top-0 z-40 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-400 flex items-center justify-center font-black text-black text-lg shadow-md shadow-emerald-500/20">
+              S
+            </div>
+            <span className="text-xl font-extrabold tracking-tight text-white">SpendiFy</span>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold">
+            <span className={`px-2.5 py-1 rounded-full border ${
+              kyc?.status === 'APPROVED' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
+              KYC: {kyc?.status || 'NOT_STARTED'}
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+              Score: {latestLoan?.prediction?.creditScore || 785}
+            </span>
+          </div>
         </div>
-      </nav>
+
+        <div className="flex items-center gap-4">
+          <div className="text-right hidden sm:block">
+            <span className="text-sm font-bold text-white block">{user?.name}</span>
+            <span className="text-[11px] text-slate-400 font-mono">{user?.email}</span>
+          </div>
+          <button
+            onClick={() => setActiveTab('profile')}
+            className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center font-bold text-white shadow-md text-sm cursor-pointer"
+          >
+            {user?.name.charAt(0)}
+          </button>
+        </div>
+      </header>
 
       {/* Main Container */}
-      <main className="max-w-xl mx-auto px-6 pt-6">
+      <main className="max-w-5xl mx-auto px-4 md:px-6 pt-6">
 
-        {/* ─── TAB 1: HOME ─── */}
+        {/* ─── TAB 1: HOME (EXECUTIVE FINANCIAL HEALTH) ─── */}
         {activeTab === 'home' && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 animate-fadeIn">
             
-            {/* Header Greeting */}
-            <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Good Morning, {user?.name.split(' ')[0]}</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Welcome to your simple financial space.</p>
+            {/* Header Greeting & Surplus Pill */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-900 to-[#0F172A] border border-slate-800 shadow-xl">
+              <div>
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                  <ShieldCheck size={14} /> AI Financial Dashboard
+                </span>
+                <h1 className="text-2xl md:text-3xl font-black text-white">Hello, {user?.name.split(' ')[0]} 👋</h1>
+                <p className="text-slate-400 text-sm mt-0.5">Your live cashflow, credit telemetry, and affordability status.</p>
+              </div>
+
+              <div className="flex items-center gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                <div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Monthly Surplus</span>
+                  <span className="text-2xl font-black text-emerald-400">₹33,250</span>
+                </div>
+                <div className="h-8 w-px bg-slate-800"></div>
+                <div>
+                  <span className="text-[11px] text-slate-400 font-medium block">Debt / Income</span>
+                  <span className="text-2xl font-black text-cyan-400">12%</span>
+                </div>
+              </div>
             </div>
 
-            {/* KYC Alert Block if not approved */}
+            {/* KYC Alert if not approved */}
             {kyc?.status !== 'APPROVED' && (
-              <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col gap-3 shadow-sm">
+              <div className="p-5 rounded-2xl bg-amber-950/30 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="text-[#FFB300] shrink-0 mt-0.5" size={20} />
+                  <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={20} />
                   <div>
-                    <span className="font-bold block text-slate-800 text-md">Verification Under Review</span>
-                    <span className="text-sm text-slate-600 mt-1 block">We are verifying your documents. Your loan application is locked until verification is complete.</span>
+                    <span className="font-bold block text-amber-200 text-sm">KYC Compliance Pending</span>
+                    <span className="text-xs text-amber-300/80 mt-0.5 block">
+                      Government identity and bank statement verification is required before loan disbursal.
+                    </span>
                   </div>
                 </div>
-                <Link to="/kyc" className="mt-2 py-3 text-center rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all cursor-pointer">
-                  Check Upload Details
+                <Link
+                  to="/kyc"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-md transition-all text-center"
+                >
+                  Complete KYC
                 </Link>
               </div>
             )}
 
-            {/* Early Warning Risk Alerts */}
-            {kyc?.status === 'APPROVED' && alerts.map(alert => (
-              <div key={alert.id} className="p-4 rounded-xl border border-red-200 bg-red-50 flex items-start gap-3">
-                <AlertTriangle className="text-danger shrink-0 mt-0.5" size={18} />
+            {/* Financial Warnings & Notification Center */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <AlertCircle size={16} className="text-cyan-400" /> Dynamic Financial Warnings & Alerts
+                </h2>
+                <span className="text-xs text-slate-500">
+                  {alerts.filter(a => !a.resolved).length} active rule triggers
+                </span>
+              </div>
+
+              {alerts.filter(a => !a.resolved).length === 0 ? (
+                <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-xs text-slate-400">
+                  No active financial stress conditions detected. Your accounts are operating smoothly.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {alerts.filter(a => !a.resolved).map(alert => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md transition-all ${
+                        alert.severity === 'URGENT' || alert.level === 'RED'
+                          ? 'bg-red-950/20 border-red-500/40 text-red-200'
+                          : 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className={`shrink-0 mt-0.5 ${
+                          alert.severity === 'URGENT' || alert.level === 'RED' ? 'text-red-400' : 'text-amber-400'
+                        }`} size={18} />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-white">{alert.title || alert.triggerType}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-black/40">
+                              {alert.severity || alert.level}
+                            </span>
+                          </div>
+                          <p className="text-xs mt-1 text-slate-300">{alert.description}</p>
+                          {alert.recommendedAction && (
+                            <span className="text-[11px] text-cyan-300/90 mt-1 block">
+                              👉 <strong>Recommended Action:</strong> {alert.recommendedAction}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleResolveAlert(alert.id)}
+                        className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 self-end sm:self-center transition-all cursor-pointer shrink-0"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Action Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button
+                onClick={() => setActiveTab('calculator')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                  <Calculator size={22} />
+                </div>
                 <div>
-                  <span className="font-bold text-sm text-slate-800 block">Alert: Financial Warning</span>
-                  <span className="text-xs text-slate-600 leading-relaxed block mt-0.5">{alert.description}</span>
+                  <span className="font-extrabold text-white text-md block">Loan Calculator</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Reducing-balance EMI & schedules</span>
                 </div>
-              </div>
-            ))}
+              </button>
 
-            {/* Score and Eligibility Cards (Only visible if KYC is Approved) */}
-            {kyc?.status === 'APPROVED' ? (
-              <>
-                {/* Financial Score Card */}
-                <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex items-center justify-between relative overflow-hidden">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Financial Score</span>
-                    <span className="text-5xl font-black text-primary">
-                      {latestLoan?.prediction?.creditScore || 720}
+              <button
+                onClick={() => setActiveTab('suggestions')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <Compass size={22} />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white text-md block">Affordability</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Surplus analysis & scenarios</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('repayments')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
+                  <CalendarCheck size={22} />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white text-md block">Repayments</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Pay EMI & download receipts</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('ai')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                  <MessageSquare size={22} />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white text-md block">Gemini AI</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Natural-language advisory</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Active Loan Snapshot */}
+            {activeLoan && (
+              <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Loan Facility</span>
+                    <h3 className="text-lg font-bold text-white">Facility Reference #{activeLoan.id.slice(0, 8)}</h3>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    {activeLoan.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                  <div>
+                    <span className="text-slate-500 block">Sanctioned Principal</span>
+                    <span className="text-base font-bold text-white">₹{activeLoan.amount?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Monthly EMI</span>
+                    <span className="text-base font-bold text-emerald-400">₹{activeLoan.emi?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Rate of Interest</span>
+                    <span className="text-base font-bold text-cyan-400">{activeLoan.interestRate}% p.a.</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Outstanding Balance</span>
+                    <span className="text-base font-bold text-amber-400">
+                      ₹{(activeLoan.outstandingBalance || activeLoan.amount)?.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-xs text-slate-500 mt-1">Excellent (Based on statement analysis)</span>
-                  </div>
-                  {/* Visual score dial mockup */}
-                  <div className="w-20 h-20 rounded-full border-8 border-accent border-r-primary flex items-center justify-center text-primary font-bold text-xs">
-                    Score
                   </div>
                 </div>
 
-                {/* Loan Eligibility Card */}
-                <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex flex-col gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Loan Eligibility</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getEligibilityBg(latestLoan?.prediction?.riskCategory || 'LOW')}`}>
-                      {latestLoan?.prediction?.riskCategory || 'LOW'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mt-2 font-medium">
-                    {getEligibilityText(latestLoan?.prediction?.riskCategory || 'LOW')}
-                  </p>
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-xs text-slate-400">
+                    Next EMI Scheduled: {new Date(activeLoan.nextDueDate || Date.now() + 86400000 * 4).toLocaleDateString('en-IN')}
+                  </span>
+                  <button
+                    onClick={() => setActiveTab('repayments')}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    View Amortisation Schedule <ArrowRight size={14} />
+                  </button>
                 </div>
-              </>
-            ) : null}
-
-            {/* Current Active Loan Card */}
-            {activeLoan ? (
-              <div className="p-6 rounded-3xl bg-accent text-[#1B5E20] border border-green-200 shadow-sm flex flex-col gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider opacity-75">Active Loan Details</span>
-                <span className="text-3xl font-extrabold">₹{activeLoan.amount}</span>
-                <div className="flex justify-between text-xs font-bold opacity-80 mt-2">
-                  <span>Monthly EMI: ₹{activeLoan.emi}</span>
-                  <span>Rate: {activeLoan.interestRate}%</span>
-                </div>
-                <button 
-                  onClick={() => alert("Repayment interface is coming soon!")}
-                  className="mt-4 w-full py-3.5 bg-primary hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold rounded-xl text-sm shadow-sm transition-all cursor-pointer"
-                >
-                  Pay Current EMI
-                </button>
-              </div>
-            ) : (
-              <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm text-center">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Loan</span>
-                <p className="text-sm text-slate-500 my-4">You have no active loans right now.</p>
-                
-                {/* One Large Primary Button */}
-                <button
-                  onClick={() => kyc?.status === 'APPROVED' ? setActiveTab('loan') : alert('Verification required first!')}
-                  disabled={kyc?.status !== 'APPROVED'}
-                  className={`w-full py-4 font-bold rounded-xl text-md shadow-md transition-all cursor-pointer ${
-                    kyc?.status === 'APPROVED' 
-                      ? 'bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98]' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                  }`}
-                >
-                  Apply for Loan
-                </button>
               </div>
             )}
-
-            {/* Quick Actions Grid */}
-            <div className="mt-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Quick Actions</h4>
-              <div className="grid grid-cols-3 gap-3">
-                <button 
-                  onClick={() => navigate('/kyc')}
-                  className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center justify-center text-center gap-1.5 border border-slate-100"
-                >
-                  <span className="text-xl">🪪</span>
-                  <span className="text-xs font-bold text-slate-700">KYC Status</span>
-                </button>
-
-                <button 
-                  onClick={() => kyc?.status === 'APPROVED' ? setActiveTab('loan') : alert('Please complete document review first.')}
-                  className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center justify-center text-center gap-1.5 border border-slate-100"
-                >
-                  <span className="text-xl">💳</span>
-                  <span className="text-xs font-bold text-slate-700">Apply Loan</span>
-                </button>
-
-                <button 
-                  onClick={() => setActiveTab('ai')}
-                  className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center justify-center text-center gap-1.5 border border-slate-100"
-                >
-                  <span className="text-xl">💬</span>
-                  <span className="text-xs font-bold text-slate-700">AI Assistant</span>
-                </button>
-              </div>
-            </div>
 
           </div>
         )}
 
-        {/* ─── TAB 2: LOAN APPLICATION ─── */}
+        {/* ─── TAB 2: PHASE 4 PROFESSIONAL LOAN CALCULATOR ─── */}
+        {activeTab === 'calculator' && (
+          <div className="flex flex-col gap-6 animate-fadeIn">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-white">Reducing-Balance Loan Calculator</h1>
+              <p className="text-slate-400 text-sm mt-0.5">
+                Deterministic mathematical amortization using the standard reducing-balance formula: EMI = P · r · (1+r)ⁿ / ((1+r)ⁿ − 1).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Inputs Column */}
+              <div className="lg:col-span-1 p-6 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-5">
+                <h3 className="font-bold text-white text-sm uppercase tracking-wider flex items-center gap-2">
+                  <Percent size={16} className="text-emerald-400"/> Loan Parameters
+                </h3>
+
+                {/* Amount */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">Loan Principal (₹)</label>
+                    <span className="font-mono text-emerald-400 font-bold">₹{calcAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5000"
+                    max="300000"
+                    step="5000"
+                    value={calcAmount}
+                    onChange={e => setCalcAmount(Number(e.target.value))}
+                    className="w-full accent-emerald-500 cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    value={calcAmount}
+                    onChange={e => setCalcAmount(Math.max(1000, Number(e.target.value)))}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Interest Rate */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">Annual Interest Rate (%)</label>
+                    <span className="font-mono text-cyan-400 font-bold">{calcRate}% p.a.</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="8"
+                    max="24"
+                    step="0.5"
+                    value={calcRate}
+                    onChange={e => setCalcRate(Number(e.target.value))}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Tenure */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">Tenure (Months)</label>
+                    <span className="font-mono text-purple-400 font-bold">{calcTenure} Months</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[6, 12, 18, 24].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCalcTenure(t)}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          calcTenure === t ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {t}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Processing Fee */}
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-800">
+                  <label className="text-xs font-bold text-slate-400">Processing Fee (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={calcFeePercent}
+                    onChange={e => setCalcFeePercent(Math.max(0, Number(e.target.value)))}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAffordAmount(calcAmount);
+                    setAffordTenure(calcTenure);
+                    setAffordRate(calcRate);
+                    setActiveTab('suggestions');
+                  }}
+                  className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Compass size={16} /> Test My Affordability
+                </button>
+              </div>
+
+              {/* Output Display & Breakdown */}
+              <div className="lg:col-span-2 flex flex-col gap-6">
+                {calcResult && (
+                  <div className="p-8 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                      <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Commitment</span>
+                        <div className="text-4xl font-black text-emerald-400 mt-1">
+                          ₹{calcResult.emi.toLocaleString('en-IN')} <span className="text-sm font-normal text-slate-400">/ month</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowAmortTable(!showAmortTable)}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Clock size={14} /> {showAmortTable ? 'Hide Schedule' : 'View Monthly Amortisation'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[11px] text-slate-400 block">Principal</span>
+                        <span className="text-lg font-black text-white">₹{calcResult.principal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[11px] text-slate-400 block">Total Interest</span>
+                        <span className="text-lg font-black text-cyan-400">₹{calcResult.totalInterest.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[11px] text-slate-400 block">Processing Fee</span>
+                        <span className="text-lg font-black text-purple-400">₹{calcResult.processingFee.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[11px] text-slate-400 block">Total Payable</span>
+                        <span className="text-lg font-black text-amber-400">₹{calcResult.totalPayable.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    {/* Visual Ratio Bar */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>Principal: {Math.round((calcResult.principal / calcResult.totalRepayment) * 100)}%</span>
+                        <span>Interest: {Math.round((calcResult.totalInterest / calcResult.totalRepayment) * 100)}%</span>
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden flex">
+                        <div
+                          className="bg-emerald-500 h-full"
+                          style={{ width: `${(calcResult.principal / calcResult.totalRepayment) * 100}%` }}
+                        ></div>
+                        <div
+                          className="bg-cyan-400 h-full"
+                          style={{ width: `${(calcResult.totalInterest / calcResult.totalRepayment) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Amortisation Table View */}
+                    {showAmortTable && (
+                      <div className="overflow-x-auto mt-2 border-t border-slate-800 pt-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                          Monthly Reducing-Balance Amortisation Table ({calcResult.schedule.length} Instalments)
+                        </h4>
+                        <table className="w-full text-xs text-left font-mono">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400">
+                              <th className="pb-2">Month</th>
+                              <th className="pb-2">Opening (₹)</th>
+                              <th className="pb-2">EMI (₹)</th>
+                              <th className="pb-2 text-emerald-400">Principal (₹)</th>
+                              <th className="pb-2 text-cyan-400">Interest (₹)</th>
+                              <th className="pb-2">Closing (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/50">
+                            {calcResult.schedule.map(row => (
+                              <tr key={row.instalmentNumber} className="hover:bg-slate-800/30">
+                                <td className="py-2 text-slate-300 font-bold">#{row.instalmentNumber}</td>
+                                <td className="py-2 text-slate-400">₹{row.openingBalance.toLocaleString('en-IN')}</td>
+                                <td className="py-2 text-white font-bold">₹{row.emiAmount.toLocaleString('en-IN')}</td>
+                                <td className="py-2 text-emerald-400">₹{row.principalComponent.toLocaleString('en-IN')}</td>
+                                <td className="py-2 text-cyan-400">₹{row.interestComponent.toLocaleString('en-IN')}</td>
+                                <td className="py-2 text-slate-300">₹{row.closingBalance.toLocaleString('en-IN')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 3: PHASE 5 PERSONALIZED LOAN SUGGESTIONS ─── */}
+        {activeTab === 'suggestions' && (
+          <div className="flex flex-col gap-6 animate-fadeIn">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-white">Personalized Loan Affordability</h1>
+              <p className="text-slate-400 text-sm mt-0.5">
+                Deterministic cashflow analysis: Monthly Surplus = Income − Living Expenses − Existing Debt EMIs.
+              </p>
+            </div>
+
+            {/* Income & Expense Confirmation Card */}
+            <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Confirmed Financial Baseline</span>
+                <span className="text-xs text-emerald-400 font-mono">Factual telemetry loaded</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-300">Monthly Net Income (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 55000"
+                    value={customIncome}
+                    onChange={e => setCustomIncome(e.target.value)}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-500">Default: ₹55,000 / month</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-300">Essential Expenses (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 28000"
+                    value={customExpenses}
+                    onChange={e => setCustomExpenses(e.target.value)}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-500">Rent, groceries, utilities</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-300">Existing Debt EMIs (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 0"
+                    value={customDebt}
+                    onChange={e => setCustomDebt(e.target.value)}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[10px] text-slate-500">Other active loan commitments</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Affordability Status Banner */}
+            {affordData && (
+              <div className={`p-6 rounded-3xl border shadow-xl flex flex-col gap-4 ${
+                affordData.overallStatus === 'COMFORTABLE'
+                  ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-200'
+                  : affordData.overallStatus === 'MODERATE'
+                  ? 'bg-blue-950/20 border-blue-500/40 text-blue-200'
+                  : 'bg-amber-950/20 border-amber-500/40 text-amber-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">
+                      {affordData.overallStatus === 'COMFORTABLE' ? '🛡️' : affordData.overallStatus === 'MODERATE' ? '⚖️' : '⚠️'}
+                    </span>
+                    <div>
+                      <h3 className="font-extrabold text-white text-lg">Affordability: {affordData.overallStatus}</h3>
+                      <p className="text-xs text-slate-300">{affordData.recommendationSummary}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => runAffordabilityCheck(true)}
+                    disabled={explainingWithAI}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
+                  >
+                    <Sparkles size={14} />
+                    {explainingWithAI ? 'Gemini Analyzing...' : 'Explain with Gemini AI'}
+                  </button>
+                </div>
+
+                {geminiAffordExplain && (
+                  <div className="p-4 rounded-2xl bg-black/40 border border-emerald-500/30 text-xs text-slate-200 leading-relaxed font-sans">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block mb-1">
+                      Gemini Advisory Explanation
+                    </span>
+                    {geminiAffordExplain}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Suggested Scenarios Cards */}
+            {affordData?.scenarios && (
+              <div className="flex flex-col gap-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                  Recommended Restructuring & Alternative Loan Scenarios
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {affordData.scenarios.map((sc: LoanScenarioSuggestion) => (
+                    <div
+                      key={sc.scenarioType}
+                      className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-lg flex flex-col justify-between gap-4 hover:border-slate-700 transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <span className="font-bold text-white text-sm">{sc.title}</span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            sc.affordabilityStatus === 'COMFORTABLE'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {sc.affordabilityStatus}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mt-4 text-xs font-mono">
+                          <div>
+                            <span className="text-slate-500 block">Monthly EMI</span>
+                            <span className="text-lg font-black text-emerald-400">₹{sc.emi.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block">Projected Surplus</span>
+                            <span className={`text-lg font-black ${sc.projectedSurplus >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
+                              ₹{sc.projectedSurplus.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block">Total Interest</span>
+                            <span className="font-bold text-slate-300">₹{sc.totalInterest.toLocaleString('en-IN')}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block">Debt-to-Income</span>
+                            <span className="font-bold text-slate-300">{sc.debtToIncomeRatio}%</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 mt-4 leading-relaxed">{sc.rationale}</p>
+                        <span className="text-[11px] text-emerald-400/90 block mt-1">💡 {sc.recommendation}</span>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setApplyAmount(String(sc.amount));
+                          setApplyTenure(String(sc.tenureMonths));
+                          setActiveTab('loan');
+                        }}
+                        className="w-full py-2.5 mt-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        Apply for this Plan <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── TAB 4: PHASE 7 COMPLETE REPAYMENTS WINDOW ─── */}
+        {activeTab === 'repayments' && (
+          <div className="flex flex-col gap-6 animate-fadeIn">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-black text-white">Repayment Management</h1>
+              <p className="text-slate-400 text-sm mt-0.5">
+                Track scheduled instalments, verify transactions, and simulate demo EMI payments with receipt generation.
+              </p>
+            </div>
+
+            {repaymentLoans.length === 0 ? (
+              <div className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 text-sm">
+                No active loan facilities requiring repayment found. Submit a loan application to activate repayment tracking.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                
+                {/* Loan Selector Tabs */}
+                {repaymentLoans.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {repaymentLoans.map((l, idx) => (
+                      <button
+                        key={l.id}
+                        onClick={() => setSelectedRepaymentLoan(l)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          selectedRepaymentLoan?.id === l.id
+                            ? 'bg-emerald-500 text-black shadow-md'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        Loan #{l.id.slice(0, 8)} (₹{l.amount.toLocaleString('en-IN')})
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected Loan Repayment Card */}
+                {selectedRepaymentLoan && (
+                  <div className="p-6 md:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl flex flex-col gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                      <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Facility</span>
+                        <h2 className="text-2xl font-black text-white">Facility Reference #{selectedRepaymentLoan.id.slice(0, 8)}</h2>
+                        <span className="text-xs text-slate-400">
+                          {selectedRepaymentLoan.tenureMonths} Months @ {selectedRepaymentLoan.interestRate}% p.a. Reducing-Balance
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            const nextUnpaid = selectedRepaymentLoan.repayments?.find((s: any) => s.status !== 'PAID');
+                            setPaymentTargetInstalment(nextUnpaid || null);
+                            setPaymentModalOpen(true);
+                          }}
+                          disabled={selectedRepaymentLoan.status === 'PAID'}
+                          className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <CreditCard size={16} /> Pay Next EMI (Demo Gateway)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress Metrics Strip */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                        <span className="text-slate-500 block">Sanctioned Amount</span>
+                        <span className="text-lg font-bold text-white">₹{selectedRepaymentLoan.amount.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                        <span className="text-slate-500 block">Outstanding Balance</span>
+                        <span className="text-lg font-bold text-amber-400">
+                          ₹{(selectedRepaymentLoan.outstandingBalance || selectedRepaymentLoan.amount).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                        <span className="text-slate-500 block">Total Repaid</span>
+                        <span className="text-lg font-bold text-emerald-400">
+                          ₹{(selectedRepaymentLoan.totalRepaid || 0).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                        <span className="text-slate-500 block">Instalment Progress</span>
+                        <span className="text-lg font-bold text-cyan-400">
+                          {selectedRepaymentLoan.paidInstalments || 0} / {selectedRepaymentLoan.totalInstalments || selectedRepaymentLoan.tenureMonths} Paid
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Repayment Schedule Table */}
+                    <div className="flex flex-col gap-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Full Repayment Instalment Schedule
+                      </h3>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left font-mono">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400">
+                              <th className="py-2.5 px-3">Instalment</th>
+                              <th className="py-2.5 px-3">Due Date</th>
+                              <th className="py-2.5 px-3">EMI Amount</th>
+                              <th className="py-2.5 px-3">Principal Component</th>
+                              <th className="py-2.5 px-3">Interest Component</th>
+                              <th className="py-2.5 px-3">Balance Remaining</th>
+                              <th className="py-2.5 px-3">Status</th>
+                              <th className="py-2.5 px-3">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60">
+                            {selectedRepaymentLoan.repayments?.map((inst: RepaymentScheduleItem) => (
+                              <tr key={inst.id} className="hover:bg-slate-800/30">
+                                <td className="py-3 px-3 font-bold text-white">Instalment #{inst.instalmentNumber}</td>
+                                <td className="py-3 px-3 text-slate-400">
+                                  {new Date(inst.dueDate).toLocaleDateString('en-IN')}
+                                </td>
+                                <td className="py-3 px-3 text-white font-bold">₹{inst.emiAmount.toLocaleString('en-IN')}</td>
+                                <td className="py-3 px-3 text-emerald-400">₹{inst.principalComponent.toLocaleString('en-IN')}</td>
+                                <td className="py-3 px-3 text-cyan-400">₹{inst.interestComponent.toLocaleString('en-IN')}</td>
+                                <td className="py-3 px-3 text-slate-300">₹{inst.closingBalance.toLocaleString('en-IN')}</td>
+                                <td className="py-3 px-3">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                    inst.status === 'PAID'
+                                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                      : inst.status === 'DUE_SOON'
+                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      : inst.status === 'OVERDUE'
+                                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                  }`}>
+                                    {inst.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3">
+                                  {inst.status !== 'PAID' ? (
+                                    <button
+                                      onClick={() => {
+                                        setPaymentTargetInstalment(inst);
+                                        setPaymentModalOpen(true);
+                                      }}
+                                      className="px-3 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold cursor-pointer transition-all"
+                                    >
+                                      Pay Now
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                      <Check size={12} className="text-emerald-400" /> Paid
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── TAB 5: LOAN APPLICATION ─── */}
         {activeTab === 'loan' && (
-          <div className="flex flex-col gap-6">
-            
-            {/* Form State */}
+          <div className="flex flex-col gap-6 animate-fadeIn">
             {loanState === 'form' && (
-              <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 shadow-md flex flex-col gap-6">
+              <div className="p-6 md:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-6">
                 <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900">Apply for a Loan</h2>
-                  <p className="text-slate-500 text-sm mt-0.5">Please fill in these simple financial details.</p>
+                  <h2 className="text-2xl font-black text-white">Apply for Micro-Loan</h2>
+                  <p className="text-slate-400 text-sm mt-0.5">Underwriting powered by real XGBoost Machine Learning model.</p>
                 </div>
 
                 {applyError && (
-                  <div className="p-4 bg-red-50 border border-red-200 text-danger rounded-xl text-sm font-medium">
+                  <div className="p-4 bg-red-950/40 border border-red-500/40 text-red-300 rounded-xl text-xs font-medium">
                     {applyError}
                   </div>
                 )}
 
                 <form onSubmit={handleApplyLoan} className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-slate-700">How much money do you need? (INR)</label>
-                    <input
-                      type="number"
-                      value={applyAmount}
-                      onChange={(e) => setApplyAmount(e.target.value)}
-                      required
-                      placeholder="e.g. 25000"
-                      className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-bold text-slate-700">How long do you need it for? (Duration)</label>
-                    <select
-                      value={applyTenure}
-                      onChange={(e) => setApplyTenure(e.target.value)}
-                      className="px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-md focus:border-primary focus:outline-none font-medium"
-                    >
-                      <option value="3">3 Months</option>
-                      <option value="6">6 Months</option>
-                      <option value="12">12 Months</option>
-                      <option value="18">18 Months</option>
-                      <option value="24">24 Months</option>
-                    </select>
-                  </div>
-
-                  <div className="mt-4 p-4 border border-blue-200 bg-blue-50 rounded-2xl flex flex-col gap-4">
-                    <h3 className="font-bold text-blue-900">AI Credit Assessment Data</h3>
-                    <p className="text-xs text-blue-700">The following demographic and 6-month historical data is required to run the real XGBoost ML model.</p>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold">Credit Limit (LIMIT_BAL)</label>
-                        <input type="number" value={limitBal} onChange={e=>setLimitBal(e.target.value)} className="px-3 py-2 rounded-lg border text-sm" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold">Age</label>
-                        <input type="number" value={age} onChange={e=>setAge(e.target.value)} className="px-3 py-2 rounded-lg border text-sm" />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold">Gender</label>
-                        <select value={sex} onChange={e=>setSex(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
-                          <option value="1">Male</option>
-                          <option value="2">Female</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold">Education</label>
-                        <select value={education} onChange={e=>setEducation(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
-                          <option value="1">Graduate School</option>
-                          <option value="2">University</option>
-                          <option value="3">High School</option>
-                          <option value="4">Other</option>
-                        </select>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold">Marital Status</label>
-                        <select value={marriage} onChange={e=>setMarriage(e.target.value)} className="px-3 py-2 rounded-lg border text-sm">
-                          <option value="1">Married</option>
-                          <option value="2">Single</option>
-                          <option value="3">Other</option>
-                        </select>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-300">Requested Loan Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={applyAmount}
+                        onChange={e => setApplyAmount(e.target.value)}
+                        required
+                        className="px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                      />
                     </div>
 
-                    <div className="overflow-x-auto mt-2">
-                      <table className="w-full text-xs text-left">
-                        <thead>
-                          <tr className="text-slate-500">
-                            <th className="pb-2">Month</th>
-                            <th className="pb-2">Status (0=Duly)</th>
-                            <th className="pb-2">Bill Amount</th>
-                            <th className="pb-2">Paid Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[0,1,2,3,4,5].map(i => (
-                            <tr key={i}>
-                              <td className="py-1 font-bold">M-{i+1}</td>
-                              <td className="py-1 pr-2">
-                                <input type="number" value={payHistory[i]} onChange={e => {
-                                  const newH = [...payHistory];
-                                  newH[i] = Number(e.target.value);
-                                  setPayHistory(newH);
-                                }} className="w-full px-2 py-1 border rounded bg-white" />
-                              </td>
-                              <td className="py-1 pr-2">
-                                <input type="number" value={billAmts[i]} onChange={e => {
-                                  const newB = [...billAmts];
-                                  newB[i] = Number(e.target.value);
-                                  setBillAmts(newB);
-                                }} className="w-full px-2 py-1 border rounded bg-white" />
-                              </td>
-                              <td className="py-1">
-                                <input type="number" value={payAmts[i]} onChange={e => {
-                                  const newP = [...payAmts];
-                                  newP[i] = Number(e.target.value);
-                                  setPayAmts(newP);
-                                }} className="w-full px-2 py-1 border rounded bg-white" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-300">Repayment Duration</label>
+                      <select
+                        value={applyTenure}
+                        onChange={e => setApplyTenure(e.target.value)}
+                        className="px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                      >
+                        <option value="6">6 Months</option>
+                        <option value="12">12 Months</option>
+                        <option value="18">18 Months</option>
+                        <option value="24">24 Months</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Demographic and Historical Credit Inputs for XGBoost */}
+                  <div className="p-5 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                        Credit Assessment Telemetry (XGBoost Input Vector)
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-mono">23 Trained Features</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-400 block mb-1">LIMIT_BAL</label>
+                        <input
+                          type="number"
+                          value={limitBal}
+                          onChange={e => setLimitBal(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-400 block mb-1">Age</label>
+                        <input
+                          type="number"
+                          value={age}
+                          onChange={e => setAge(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-400 block mb-1">Education</label>
+                        <select
+                          value={education}
+                          onChange={e => setEducation(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono"
+                        >
+                          <option value="1">1 (Grad)</option>
+                          <option value="2">2 (Univ)</option>
+                          <option value="3">3 (School)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-400 block mb-1">PAY_0 (Delay)</label>
+                        <select
+                          value={payHistory[0]}
+                          onChange={e => {
+                            const newH = [...payHistory];
+                            newH[0] = Number(e.target.value);
+                            setPayHistory(newH);
+                          }}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono"
+                        >
+                          <option value="0">0 (Duly Paid)</option>
+                          <option value="1">1 (1 Mo Delay)</option>
+                          <option value="2">2 (2 Mo Delay)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-4 mt-2 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer"
+                    className="w-full py-4 mt-2 rounded-xl font-extrabold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black hover:brightness-110 active:scale-98 shadow-lg shadow-emerald-500/20 transition-all text-sm cursor-pointer"
                   >
-                    Continue
+                    Submit Application for ML Underwriting
                   </button>
                 </form>
               </div>
@@ -548,244 +1238,164 @@ export const BorrowerDashboard: React.FC = () => {
 
             {/* Analyzing State */}
             {loanState === 'analyzing' && (
-              <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 shadow-md text-center py-20 flex flex-col items-center justify-center gap-6">
-                <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Analyzing cashflows...</h2>
-                  <p className="text-slate-500 text-md max-w-xs mx-auto">
-                    AI is analyzing your financial behaviour. Please do not close this screen.
-                  </p>
-                </div>
+              <div className="p-12 rounded-3xl bg-slate-900/70 border border-slate-800 text-center flex flex-col items-center justify-center gap-4">
+                <div className="w-14 h-14 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <h3 className="text-xl font-bold text-white">Running XGBoost Credit Scoring...</h3>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Calculating default probability and extracting SHAP feature attributions via TreeExplainer.
+                </p>
               </div>
             )}
 
             {/* Result State */}
             {loanState === 'result' && analysisResult && (
-              <div className="flex flex-col gap-6">
-                
-                {/* Result Title */}
-                <div className="text-center">
-                  <span className="text-5xl">📊</span>
-                  <h2 className="text-2xl font-extrabold text-slate-900 mt-3">AI Evaluation Result</h2>
-                  <p className="text-slate-500 text-sm">Review the underwriting response below.</p>
+              <div className="p-8 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-2xl flex flex-col gap-6 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">Application Submitted</span>
+                    <h2 className="text-2xl font-black text-white">Application Reference #{analysisResult.loan.id.slice(0, 8)}</h2>
+                  </div>
+                  <span className="px-3.5 py-1 rounded-full text-xs font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    STATUS: PENDING REVIEW
+                  </span>
                 </div>
 
-                {/* Score & Eligibility metrics */}
-                <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex flex-col gap-4">
-                  
-                  {/* Financial Score */}
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-slate-600 font-bold">Financial Score</span>
-                    <span className="text-2xl font-black text-primary">
-                      {analysisResult.prediction?.creditScore}
-                    </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-slate-500 block">Calculated Score</span>
+                    <span className="text-xl font-black text-emerald-400">{analysisResult.prediction?.creditScore} / 850</span>
                   </div>
-
-                  {/* Loan Eligibility */}
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-slate-600 font-bold">Loan Eligibility</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
-                      analysisResult.prediction?.riskCategory === 'LOW' ? 'bg-green-100 text-[#43A047]' : 'bg-red-100 text-[#E53935]'
-                    }`}>
-                      {analysisResult.prediction?.riskCategory}
-                    </span>
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-slate-500 block">Risk Classification</span>
+                    <span className="text-xl font-black text-cyan-400">{analysisResult.prediction?.riskCategory}</span>
                   </div>
-
-                  {/* Repayment Confidence */}
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-slate-600 font-bold">Loan Repayment Chance</span>
-                    <span className={`font-black text-md ${getRepaymentChanceColor(analysisResult.prediction?.defaultProbability)}`}>
-                      {getRepaymentChanceText(analysisResult.prediction?.defaultProbability)}
-                    </span>
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-slate-500 block">Monthly EMI</span>
+                    <span className="text-xl font-black text-white">₹{analysisResult.loan.emi}</span>
                   </div>
-
-                  {/* Recommended Amount */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600 font-bold">Recommended Loan Amount</span>
-                    <span className="font-extrabold text-slate-900 text-lg">
-                      ₹{analysisResult.loan?.amount}
-                    </span>
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+                    <span className="text-slate-500 block">Total Scheduled</span>
+                    <span className="text-xl font-black text-purple-400">{analysisResult.loan.tenureMonths} Months</span>
                   </div>
                 </div>
 
-                {/* SHAP EXPLANATIONS */}
-                {analysisResult.prediction?.shapExplanation && (
-                  <div className="p-6 rounded-3xl bg-blue-50/50 border border-blue-200 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-blue-800 font-bold">
-                      <Sparkles size={18} />
-                      <span>AI Model Explainability (SHAP)</span>
-                    </div>
-                    <p className="text-xs text-slate-600 mb-2">Here are the top factors that influenced your credit score, based on the XGBoost model analysis of your input data.</p>
-                    <div className="flex flex-col gap-2">
-                      {Object.entries(analysisResult.prediction.shapExplanation)
-                        .sort(([, a]: any, [, b]: any) => Math.abs(b) - Math.abs(a))
-                        .slice(0, 5)
-                        .map(([feature, value]: any) => {
-                          const isPositive = value < 0; // Negative log-odds means LOWER default risk -> POSITIVE for score
-                          return (
-                            <div key={feature} className="flex flex-col gap-1">
-                              <div className="flex justify-between text-xs font-bold">
-                                <span className="text-slate-700 capitalize">{feature.replace(/_/g, ' ')}</span>
-                                <span className={isPositive ? 'text-green-600' : 'text-red-600'}>
-                                  {isPositive ? '+' : '-'}{Math.abs(value).toFixed(2)} impact
-                                </span>
-                              </div>
-                              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden flex">
-                                {isPositive ? (
-                                  <>
-                                    <div className="w-1/2" />
-                                    <div className="bg-green-500 h-full" style={{ width: `${Math.min(50, Math.abs(value) * 10)}%` }} />
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="bg-red-500 h-full ml-auto" style={{ width: `${Math.min(50, Math.abs(value) * 10)}%` }} />
-                                    <div className="w-1/2" />
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                      })}
-                    </div>
+                {analysisResult.prediction?.recommendationNote && (
+                  <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/30 text-xs text-blue-200">
+                    💡 <strong>Underwriter Note:</strong> {analysisResult.prediction.recommendationNote}
                   </div>
                 )}
 
-                {/* Restructuring Recommendation Modal card if risky */}
-                {recentRestructuring && recentRestructuring.recommendation && (
-                  <div className="p-6 rounded-3xl bg-amber-50/50 border border-amber-200 flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-amber-700 font-bold text-lg">
-                      <Sparkles size={20} />
-                      <span>Suggested Alternative Offer</span>
-                    </div>
-                    <p className="text-sm text-slate-600 leading-relaxed">
-                      {recentRestructuring.recommendation.rationale}
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-4 bg-white p-4 rounded-2xl border border-slate-100 text-center shadow-sm">
-                      <div>
-                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Suggested Amount</span>
-                        <span className="text-md font-bold text-primary">₹{recentRestructuring.recommendation.suggestedAmount}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Monthly EMI</span>
-                        <span className="text-md font-bold text-slate-800">₹{recentRestructuring.recommendation.suggestedEmi}/mo</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Duration</span>
-                        <span className="text-md font-bold text-slate-800">{recentRestructuring.recommendation.suggestedTenure} Months</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Rate</span>
-                        <span className="text-md font-bold text-slate-800">{recentRestructuring.recommendation.suggestedRate}%</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-1">
-                      <button onClick={handleAcceptRestructure} className="flex-1 py-3 bg-primary hover:bg-[#1B5E20] text-white font-bold rounded-xl text-sm shadow-sm active:scale-[0.98] transition-all cursor-pointer">
-                        Accept Suggested Offer
-                      </button>
-                      <button onClick={() => setLoanState('form')} className="px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-sm active:scale-[0.98] transition-all cursor-pointer">
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {!recentRestructuring && (
-                  <div className="p-6 rounded-3xl bg-green-50/50 border border-green-200 text-center">
-                    <span className="text-lg font-bold text-green-700 flex items-center justify-center gap-1.5">
-                      <CheckCircle2 size={20} />
-                      Loan Request Submitted
-                    </span>
-                    <p className="text-sm text-slate-600 mt-2">
-                      Your loan of ₹{analysisResult.loan?.amount} has been successfully created. We will update the disburals ledger shortly.
-                    </p>
-                    <button onClick={() => setLoanState('form')} className="mt-4 px-6 py-2.5 bg-primary text-white font-bold rounded-xl text-sm hover:bg-[#1B5E20] active:scale-[0.98] transition-all cursor-pointer">
-                      Done
-                    </button>
-                  </div>
-                )}
-
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setLoanState('form')}
+                    className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all cursor-pointer"
+                  >
+                    New Calculation
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('repayments')}
+                    className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs transition-all cursor-pointer"
+                  >
+                    View Repayments Schedule
+                  </button>
+                </div>
               </div>
             )}
-
           </div>
         )}
 
-        {/* ─── TAB 3: AI ASSISTANT (CHAT) ─── */}
+        {/* ─── TAB 6: PHASE 2 GEMINI AI FINANCIAL ASSISTANT ─── */}
         {activeTab === 'ai' && (
-          <div className="flex flex-col h-[70vh] bg-slate-50 border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+          <div className="flex flex-col h-[650px] bg-slate-900/80 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden animate-fadeIn">
             
-            {/* Header info */}
-            <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-primary text-lg font-bold">
-                🤖
+            {/* Chat Header */}
+            <div className="p-4 px-6 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center font-bold text-black shadow-md">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">SpendiFy AI Financial Assistant</h3>
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${geminiStatus?.configured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                    {geminiStatus?.configured ? `Google ${geminiStatus.model} Active` : 'Gemini Key Configuration Notice'}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-slate-800 text-sm">SpendiFy AI Assistant</h3>
-                <span className="text-[10px] text-[#43A047] font-bold block">Online</span>
-              </div>
+
+              <span className="text-xs text-slate-500 font-mono hidden sm:block">Factual Deterministic Grounding</span>
             </div>
 
-            {/* Message Feed */}
-            <div className="flex-grow p-4 overflow-y-auto flex flex-col gap-4">
-              
-              {/* Default Welcome bubble */}
-              <div className="max-w-[85%] p-3 rounded-2xl bg-white border border-slate-100 text-slate-700 text-sm shadow-xs self-start rounded-tl-none">
-                Hello {user?.name.split(' ')[0]} 👋 How can I help you today?
-              </div>
-
-              {chatMessages.map(msg => (
-                <div 
-                  key={msg.id} 
-                  className={`max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.isBot 
-                      ? 'bg-white border border-slate-100 text-slate-700 self-start rounded-tl-none shadow-xs' 
-                      : 'bg-primary text-white self-end rounded-tr-none shadow-sm'
-                  }`}
-                >
-                  {msg.message}
+            {/* Chat Body */}
+            <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4">
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto gap-3 text-slate-400">
+                  <span className="text-4xl">💬</span>
+                  <h4 className="font-bold text-white text-base">Your Personal AI Financial Advisor</h4>
+                  <p className="text-xs leading-relaxed">
+                    Ask me about your financial health, affordability for specific loan amounts, expense management, or repayment planning.
+                  </p>
                 </div>
-              ))}
-              
+              ) : (
+                chatMessages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 text-xs leading-relaxed ${
+                      msg.isBot
+                        ? 'self-start bg-slate-800/90 text-slate-200 border border-slate-700/80 shadow-md'
+                        : 'self-end bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium shadow-md'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{msg.message}</div>
+                    <span className="text-[10px] text-slate-400/80 mt-1.5 self-end">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))
+              )}
+
+              {sendingChat && (
+                <div className="self-start p-4 rounded-2xl bg-slate-800/90 border border-slate-700 text-slate-300 text-xs flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                  Generating AI advisory response...
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Prompt Shortcut buttons */}
-            <div className="p-3 bg-white border-t border-slate-200 flex flex-wrap gap-2">
-              <button 
-                onClick={() => sendChatToApi("Why is my score low?")}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                Why is my score low?
-              </button>
-              <button 
-                onClick={() => sendChatToApi("Can I get a bigger loan?")}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                Can I get a bigger loan?
-              </button>
-              <button 
-                onClick={() => sendChatToApi("Improve my financial score.")}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                Improve my score
-              </button>
+            {/* Quick Prompt Suggestion Chips */}
+            <div className="p-3 bg-slate-950/60 border-t border-slate-800/80 flex flex-wrap gap-2">
+              {[
+                'Explain my financial health.',
+                'Can I afford a loan of ₹50,000?',
+                'Summarise my income and spending.',
+                'What happens if I choose a longer tenure?',
+                'Help me plan my repayments.'
+              ].map(prompt => (
+                <button
+                  key={prompt}
+                  onClick={() => sendChatToApi(prompt)}
+                  className="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700/80 transition-all cursor-pointer"
+                >
+                  {prompt}
+                </button>
+              ))}
             </div>
 
-            {/* Input Form */}
-            <form onSubmit={handleSendChat} className="p-4 bg-white border-t border-slate-200 flex gap-2">
+            {/* Chat Input Bar */}
+            <form onSubmit={e => { e.preventDefault(); sendChatToApi(userMsg); }} className="p-4 bg-slate-950 border-t border-slate-800 flex gap-2">
               <input
                 type="text"
                 value={userMsg}
-                onChange={(e) => setUserMsg(e.target.value)}
-                placeholder="Type your message..."
-                className="flex-grow px-4 py-3 rounded-xl border border-slate-200 text-slate-800 focus:outline-none focus:border-primary text-sm"
+                onChange={e => setUserMsg(e.target.value)}
+                placeholder="Ask about financial health, repayment planning, or loan limits..."
+                className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-emerald-500"
               />
               <button
                 type="submit"
-                disabled={sendingChat}
-                className="p-3 rounded-xl bg-primary text-white hover:bg-[#1B5E20] transition-colors flex items-center justify-center shadow-sm"
+                disabled={sendingChat || !userMsg.trim()}
+                className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold flex items-center justify-center transition-all cursor-pointer disabled:opacity-40"
               >
                 <Send size={16} />
               </button>
@@ -793,34 +1403,40 @@ export const BorrowerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ─── TAB 4: HISTORY ─── */}
+        {/* ─── TAB 7: HISTORY ─── */}
         {activeTab === 'history' && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 animate-fadeIn">
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Loan History</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Check the status of your past requests.</p>
+              <h1 className="text-2xl md:text-3xl font-black text-white">Loan Facility History</h1>
+              <p className="text-slate-400 text-sm mt-0.5">Historical log of submitted and approved facilities.</p>
             </div>
 
             {loans.length === 0 ? (
-              <div className="p-8 rounded-3xl bg-[#F8FAFC] border border-slate-100 text-center text-slate-400 text-sm font-medium">
-                No past transactions or loans found.
+              <div className="p-8 rounded-3xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 text-sm">
+                No prior loan applications on record.
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {loans.map(loan => (
-                  <div key={loan.id} className="p-5 rounded-3xl bg-[#F8FAFC] border border-slate-100 flex items-center justify-between shadow-xs">
+              <div className="flex flex-col gap-3">
+                {loans.map(l => (
+                  <div key={l.id} className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 flex items-center justify-between shadow-md">
                     <div className="flex flex-col gap-1">
-                      <span className="font-extrabold text-lg text-slate-800">₹{loan.amount}</span>
-                      <span className="text-xs text-slate-500 font-medium">EMI: ₹{loan.emi}/mo ({loan.tenureMonths} Months)</span>
-                      <span className="text-[10px] text-slate-400">Request Date: {new Date(loan.createdAt).toLocaleDateString()}</span>
+                      <span className="text-lg font-black text-white">₹{l.amount.toLocaleString('en-IN')}</span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        EMI: ₹{l.emi}/mo ({l.tenureMonths} Months @ {l.interestRate}%)
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Date: {new Date(l.createdAt).toLocaleDateString('en-IN')} | Ref: #{l.id.slice(0, 8)}
+                      </span>
                     </div>
 
-                    <span className={`text-xs px-3 py-1 rounded-full font-bold uppercase ${
-                      loan.status === 'APPROVED' || loan.status === 'ACTIVE' ? 'bg-green-50 text-[#43A047] border border-green-200' :
-                      loan.status === 'PENDING' ? 'bg-amber-50 text-[#FFB300] border border-amber-200' :
-                      'bg-red-50 text-[#E53935] border border-red-200'
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                      l.status === 'APPROVED' || l.status === 'ACTIVE'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : l.status === 'PAID'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     }`}>
-                      {loan.status}
+                      {l.status}
                     </span>
                   </div>
                 ))}
@@ -829,60 +1445,207 @@ export const BorrowerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ─── TAB 5: PROFILE ─── */}
+        {/* ─── TAB 8: PROFILE & SETTINGS ─── */}
         {activeTab === 'profile' && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6 animate-fadeIn">
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">My Profile</h1>
-              <p className="text-slate-500 text-sm mt-0.5">Manage your personal settings.</p>
+              <h1 className="text-2xl md:text-3xl font-black text-white">My Account & Identity</h1>
+              <p className="text-slate-400 text-sm mt-0.5">Profile metadata, compliance credentials, and session controls.</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-[#F8FAFC] border border-slate-100 shadow-sm flex flex-col gap-4">
-              <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
-                <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-primary text-xl font-bold">
+            <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-4">
+              <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-black font-black text-xl">
                   {user?.name.charAt(0)}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-800 text-lg">{user?.name}</h3>
-                  <span className="text-xs text-slate-400 block">{user?.email}</span>
+                  <h3 className="font-extrabold text-white text-lg">{user?.name}</h3>
+                  <span className="text-xs text-slate-400 font-mono">{user?.email}</span>
                 </div>
               </div>
 
-              {/* KYC Status Details */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <span className="text-sm font-bold text-slate-600">Verification Status</span>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${
-                  kyc?.status === 'APPROVED' ? 'bg-green-50 text-[#43A047]' : 'bg-amber-50 text-[#FFB300]'
-                }`}>
-                  {kyc ? kyc.status : 'NOT_STARTED'}
-                </span>
+              <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                <div>
+                  <span className="text-slate-500 block">Phone</span>
+                  <span className="font-bold text-white">{user?.phone}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">KYC Status</span>
+                  <span className={`font-bold uppercase ${kyc?.status === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {kyc?.status || 'NOT_STARTED'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">PAN Number</span>
+                  <span className="font-bold text-white">{kyc?.panNumber || 'Pending Upload'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Aadhaar Reference</span>
+                  <span className="font-bold text-white">{kyc?.aadhaarNumber ? `XXXX-XXXX-${kyc.aadhaarNumber.slice(-4)}` : 'Pending'}</span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-600">Phone Number</span>
-                <span className="text-sm text-slate-500 font-bold">{user?.phone}</span>
+              <div className="flex gap-3 pt-4 border-t border-slate-800">
+                <Link
+                  to="/kyc"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-all text-center"
+                >
+                  Manage KYC Documents
+                </Link>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/40 text-red-300 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Sign Out
+                </button>
               </div>
             </div>
-
-            <button
-              onClick={logout}
-              className="w-full py-4 rounded-xl font-bold border border-red-200 text-danger bg-red-50 hover:bg-red-100 active:scale-[0.98] shadow-xs transition-all text-md cursor-pointer"
-            >
-              Sign Out
-            </button>
           </div>
         )}
 
       </main>
 
+      {/* ─── SIMULATED PAYMENT MODAL (PHASE 7) ─── */}
+      {paymentModalOpen && selectedRepaymentLoan && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-[#0F1422] border border-slate-700 shadow-2xl flex flex-col gap-5 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  Simulated Payment Gateway (Demo Mode)
+                </span>
+                <h3 className="text-lg font-bold text-white">Record EMI Payment</h3>
+              </div>
+              <button
+                onClick={() => setPaymentModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col gap-2 font-mono text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Facility ID:</span>
+                <span className="font-bold text-white">#{selectedRepaymentLoan.id.slice(0, 8)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Instalment:</span>
+                <span className="font-bold text-cyan-400">
+                  #{paymentTargetInstalment?.instalmentNumber || 1}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm pt-2 border-t border-slate-800">
+                <span className="text-white font-bold">Total Amount Due:</span>
+                <span className="text-emerald-400 font-black">
+                  ₹{(paymentTargetInstalment?.emiAmount || selectedRepaymentLoan.emi).toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-300">Select Demo Payment Method</label>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {(['SIMULATED_UPI', 'NET_BANKING', 'DEBIT_CARD'] as const).map(method => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method)}
+                    className={`py-2 px-1 rounded-xl font-bold transition-all cursor-pointer text-center ${
+                      paymentMethod === method
+                        ? 'bg-emerald-500 text-black shadow-md'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {method === 'SIMULATED_UPI' ? 'UPI' : method === 'NET_BANKING' ? 'NetBanking' : 'Card'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-amber-200">
+              ⚠️ <strong>Academic Demonstration Notice:</strong> No real bank charges or debit will occur. A verified transaction hash is created to reconcile the loan balance.
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPaymentModalOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isProcessingPayment}
+                onClick={handleExecutePayment}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg disabled:opacity-50"
+              >
+                {isProcessingPayment ? 'Processing...' : 'Authorize Demo Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PAYMENT RECEIPT MODAL ─── */}
+      {paymentSuccessModal && paymentReceipt && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-[#0F1422] border border-emerald-500/40 shadow-2xl flex flex-col gap-5 animate-scaleUp">
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                <CheckCircle2 size={28} />
+              </div>
+              <h3 className="text-xl font-black text-white">Payment Verified & Recorded</h3>
+              <span className="text-xs text-slate-400 font-mono">Receipt: {paymentReceipt.receiptNumber}</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-2.5 font-mono text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Amount Paid:</span>
+                <span className="font-bold text-emerald-400 text-sm">₹{paymentReceipt.amountPaid?.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Payment Reference:</span>
+                <span className="font-bold text-white">{paymentReceipt.referenceId}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Remaining Balance:</span>
+                <span className="font-bold text-amber-400">₹{paymentReceipt.remainingBalance?.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Facility Status:</span>
+                <span className="font-bold text-cyan-400">{paymentReceipt.loanStatus}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Timestamp:</span>
+                <span className="text-slate-300">{new Date(paymentReceipt.timestamp).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 text-center leading-relaxed">
+              {paymentReceipt.disclaimer}
+            </p>
+
+            <button
+              onClick={() => setPaymentSuccessModal(false)}
+              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs cursor-pointer shadow-md"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Sticky Tab Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-t border-slate-100 py-3 shadow-lg">
-        <div className="max-w-xl mx-auto flex items-center justify-around">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F19]/95 backdrop-blur-xl border-t border-slate-800/80 py-3 shadow-2xl">
+        <div className="max-w-xl mx-auto flex items-center justify-around px-2">
           
           <button 
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1.5 transition-colors ${
-              activeTab === 'home' ? 'text-primary font-bold scale-105' : 'text-slate-400 font-medium'
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'home' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <HomeIcon size={20} />
@@ -890,43 +1653,53 @@ export const BorrowerDashboard: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => kyc?.status === 'APPROVED' ? setActiveTab('loan') : alert('Verification required first!')}
-            className={`flex flex-col items-center gap-1.5 transition-colors ${
-              activeTab === 'loan' ? 'text-primary font-bold scale-105' : 'text-slate-400 font-medium'
+            onClick={() => setActiveTab('calculator')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'calculator' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Calculator size={20} />
+            <span className="text-[10px]">Calculator</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('suggestions')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'suggestions' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Compass size={20} />
+            <span className="text-[10px]">Affordability</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('repayments')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'repayments' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CalendarCheck size={20} />
+            <span className="text-[10px]">Repayments</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('loan')}
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'loan' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <CreditCard size={20} />
-            <span className="text-[10px]">Loan</span>
+            <span className="text-[10px]">Apply</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('ai')}
-            className={`flex flex-col items-center gap-1.5 transition-colors relative ${
-              activeTab === 'ai' ? 'text-primary font-bold scale-105' : 'text-slate-400 font-medium'
+            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+              activeTab === 'ai' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <MessageSquare size={20} />
-            <span className="text-[10px]">AI Assistant</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('history')}
-            className={`flex flex-col items-center gap-1.5 transition-colors ${
-              activeTab === 'history' ? 'text-primary font-bold scale-105' : 'text-slate-400 font-medium'
-            }`}
-          >
-            <HistoryIcon size={20} />
-            <span className="text-[10px]">History</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center gap-1.5 transition-colors ${
-              activeTab === 'profile' ? 'text-primary font-bold scale-105' : 'text-slate-400 font-medium'
-            }`}
-          >
-            <UserIcon size={20} />
-            <span className="text-[10px]">Profile</span>
+            <span className="text-[10px]">AI Chat</span>
           </button>
 
         </div>

@@ -342,17 +342,20 @@ export class MockDatabase {
   recommendations: any[] = [];
   alerts: any[] = [];
   chats: any[] = [];
+  repayments: any[] = [];
+  auditLogs: any[] = [];
 
   constructor() {
-    console.log('SpendiFy Mock Database initialized with 10 sample borrower profiles.');
+    console.log('SpendiFy Mock Database initialized with sample borrower profiles.');
     this.seedDefaults();
   }
 
   seedDefaults() {
     const adminHash = bcrypt.hashSync('Admin@123', 10);
+    const officerHash = bcrypt.hashSync('Officer@123', 10);
     const borrowerHash = bcrypt.hashSync('Borrower@123', 10);
 
-    // Admin user
+    // 1. Admin user
     this.users.push({
       id: 'admin-1',
       email: 'admin@spendify.com',
@@ -362,6 +365,107 @@ export class MockDatabase {
       role: 'ADMIN',
       createdAt: new Date(),
       updatedAt: new Date()
+    });
+
+    // 2. Loan Officer
+    this.users.push({
+      id: 'officer-1',
+      email: 'officer@spendify.com',
+      passwordHash: officerHash,
+      name: 'Senior Loan Officer',
+      phone: '+919999999992',
+      role: 'OFFICER',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // 3. Default demo borrower
+    const demoBorrowerId = 'user-borrower';
+    this.users.push({
+      id: demoBorrowerId,
+      email: 'borrower@spendify.com',
+      passwordHash: borrowerHash,
+      name: 'Aarav Sharma (Demo)',
+      phone: '+919876543200',
+      role: 'BORROWER',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    this.kycDocuments.push({
+      id: `kyc-${demoBorrowerId}`,
+      userId: demoBorrowerId,
+      aadhaarNumber: '987654321000',
+      panNumber: 'AARAV1234Z',
+      aadhaarUrl: '/uploads/sample_aadhaar.pdf',
+      panUrl: '/uploads/sample_pan.pdf',
+      bankStatementUrl: '/uploads/sample_statement.pdf',
+      esignatureUrl: '/uploads/sample_signature.png',
+      status: 'APPROVED',
+      verifiedAt: new Date(),
+      verifierNotes: 'Verified via SpendiFy AI auto-underwriting engine.',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    const demoLoanId = `loan-${demoBorrowerId}`;
+    this.loans.push({
+      id: demoLoanId,
+      userId: demoBorrowerId,
+      amount: 50000,
+      tenureMonths: 12,
+      interestRate: 12.5,
+      emi: 4450,
+      processingFee: 750,
+      totalInterest: 3400,
+      totalPayable: 54150,
+      outstandingBalance: 41100,
+      paidInstalments: 2,
+      totalInstalments: 12,
+      nextDueDate: new Date(Date.now() + 86400000 * 4).toISOString(),
+      status: 'APPROVED',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Generate repayment schedule for demo borrower
+    for (let m = 1; m <= 12; m++) {
+      const d = new Date();
+      d.setMonth(d.getMonth() + (m - 2)); // 2 paid, 1 due soon, rest upcoming
+      const isPaid = m <= 2;
+      const isDueSoon = m === 3;
+      this.repayments.push({
+        id: `${demoLoanId}-inst-${m}`,
+        loanId: demoLoanId,
+        instalmentNumber: m,
+        dueDate: d.toISOString(),
+        emiAmount: 4450,
+        principalComponent: 3950,
+        interestComponent: 500,
+        openingBalance: 50000 - ((m - 1) * 3950),
+        closingBalance: Math.max(0, 50000 - (m * 3950)),
+        status: isPaid ? 'PAID' : (isDueSoon ? 'DUE_SOON' : 'UPCOMING'),
+        paidAt: isPaid ? new Date(d.getTime() - 86400000 * 2) : undefined,
+        paymentMethod: isPaid ? 'SIMULATED_UPI' : undefined
+      });
+    }
+
+    this.predictions.push({
+      id: `pred-${demoBorrowerId}`,
+      loanId: demoLoanId,
+      creditScore: 785,
+      financialHealth: 88.5,
+      defaultProbability: 0.08,
+      riskCategory: 'LOW',
+      shapExplanation: {
+        pay_0: -0.24,
+        limit_bal: -0.18,
+        pay_amt1: -0.15,
+        bill_amt1: 0.08,
+        age: -0.05
+      },
+      recommendationNote: 'AI Profile evaluated: Disciplined Saver & Low Credit Default Risk',
+      createdAt: new Date()
     });
 
     // Populate 10 sample borrower profiles

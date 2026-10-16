@@ -5,7 +5,9 @@ import { dbService } from '../services/dbService';
 import {
   generateAmortisationSchedule,
   evaluateAffordabilityScenarios,
-  calculateReducingBalanceEMI
+  calculateReducingBalanceEMI,
+  compareLoanScenarios,
+  simulatePrepayment
 } from '../services/loanMathService';
 import { geminiService } from '../services/geminiService';
 import { SAMPLE_PROFILES_DATA } from '../config/db';
@@ -450,5 +452,174 @@ export const payEMI = async (req: AuthenticatedRequest, res: Response) => {
   } catch (error: any) {
     console.error('EMI Payment error:', error);
     res.status(500).json({ error: 'Failed to process repayment: ' + error.message });
+  }
+};
+
+/**
+ * POST /api/loans/compare
+ * Side-by-side comparison of 2 loan proposals
+ */
+export const compareScenarios = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { planA, planB } = req.body;
+    if (!planA || !planB) {
+      return res.status(400).json({ error: 'planA and planB objects are required.' });
+    }
+
+    const comparison = compareLoanScenarios(planA, planB);
+    res.status(200).json(comparison);
+  } catch (error: any) {
+    console.error('compareScenarios error:', error);
+    res.status(500).json({ error: 'Failed to compare loan scenarios.' });
+  }
+};
+
+/**
+ * POST /api/loans/simulate-prepayment
+ * Calculates tenure reduction & total interest saved with prepayment
+ */
+export const simulateLoanPrepayment = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { amount, annualRate, tenureMonths, extraMonthlyPayment, oneTimePrepayment, prepaymentMonth } = req.body;
+    if (!amount || !annualRate || !tenureMonths) {
+      return res.status(400).json({ error: 'amount, annualRate, and tenureMonths are required.' });
+    }
+
+    const result = simulatePrepayment({
+      amount: Number(amount),
+      annualRate: Number(annualRate),
+      tenureMonths: Number(tenureMonths),
+      extraMonthlyPayment: Number(extraMonthlyPayment) || 0,
+      oneTimePrepayment: Number(oneTimePrepayment) || 0,
+      prepaymentMonth: Number(prepaymentMonth) || 1
+    });
+
+    res.status(200).json(result);
+  } catch (error: any) {
+    console.error('simulateLoanPrepayment error:', error);
+    res.status(500).json({ error: 'Failed to simulate prepayment.' });
+  }
+};
+
+/**
+ * Saved Loan Scenarios
+ */
+export const getSavedScenarios = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const scenarios = await dbService.savedScenario.findMany({ where: { userId } });
+    res.status(200).json(scenarios);
+  } catch (error: any) {
+    console.error('getSavedScenarios error:', error);
+    res.status(500).json({ error: 'Failed to retrieve saved scenarios.' });
+  }
+};
+
+export const saveScenario = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { name, amount, annualRate, tenureMonths, emi, totalInterest, totalPayable } = req.body;
+    if (!name || !amount) {
+      return res.status(400).json({ error: 'Name and amount are required.' });
+    }
+
+    const saved = await dbService.savedScenario.create({
+      data: {
+        userId,
+        name: name.trim(),
+        amount: Number(amount),
+        annualRate: Number(annualRate),
+        tenureMonths: Number(tenureMonths),
+        emi: Number(emi),
+        totalInterest: Number(totalInterest),
+        totalPayable: Number(totalPayable)
+      }
+    });
+
+    res.status(201).json({ message: 'Scenario saved successfully.', scenario: saved });
+  } catch (error: any) {
+    console.error('saveScenario error:', error);
+    res.status(500).json({ error: 'Failed to save loan scenario.' });
+  }
+};
+
+export const deleteSavedScenario = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    await dbService.savedScenario.delete({ where: { id } });
+    res.status(200).json({ message: 'Saved scenario deleted.' });
+  } catch (error: any) {
+    console.error('deleteSavedScenario error:', error);
+    res.status(500).json({ error: 'Failed to delete scenario.' });
+  }
+};
+
+/**
+ * Loan Application Drafts
+ */
+export const getLoanDraft = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const draft = await dbService.loanDraft.findUnique({ where: { userId } });
+    res.status(200).json(draft || null);
+  } catch (error: any) {
+    console.error('getLoanDraft error:', error);
+    res.status(500).json({ error: 'Failed to retrieve loan draft.' });
+  }
+};
+
+export const saveLoanDraft = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    const { amount, tenureMonths, purpose, monthlyIncome, employmentType, notes } = req.body;
+
+    const draft = await dbService.loanDraft.upsert({
+      where: { userId },
+      update: {
+        amount: Number(amount) || 0,
+        tenureMonths: Number(tenureMonths) || 12,
+        purpose: purpose || '',
+        monthlyIncome: Number(monthlyIncome) || 0,
+        employmentType: employmentType || '',
+        notes: notes || ''
+      },
+      create: {
+        amount: Number(amount) || 0,
+        tenureMonths: Number(tenureMonths) || 12,
+        purpose: purpose || '',
+        monthlyIncome: Number(monthlyIncome) || 0,
+        employmentType: employmentType || '',
+        notes: notes || ''
+      }
+    });
+
+    res.status(200).json({ message: 'Draft saved successfully.', draft });
+  } catch (error: any) {
+    console.error('saveLoanDraft error:', error);
+    res.status(500).json({ error: 'Failed to save draft.' });
+  }
+};
+
+export const deleteLoanDraft = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    await dbService.loanDraft.delete({ where: { userId } });
+    res.status(200).json({ message: 'Draft discarded.' });
+  } catch (error: any) {
+    console.error('deleteLoanDraft error:', error);
+    res.status(500).json({ error: 'Failed to discard draft.' });
   }
 };

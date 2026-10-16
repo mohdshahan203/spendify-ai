@@ -9,8 +9,15 @@ import {
   KYCDocument,
   LoanCalculationResult,
   LoanScenarioSuggestion,
-  RepaymentScheduleItem
+  RepaymentScheduleItem,
+  PrepaymentSimulationResult,
+  ScenarioComparisonResult,
+  SavedLoanScenario,
+  LoanDraft
 } from '@shared/types';
+import { NotificationDrawer } from '../components/dashboard/NotificationDrawer';
+import { TransactionsTab } from '../components/dashboard/TransactionsTab';
+import { BudgetsTab } from '../components/dashboard/BudgetsTab';
 import {
   Home as HomeIcon,
   Calculator,
@@ -35,7 +42,15 @@ import {
   TrendingUp,
   Percent,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Bell,
+  PiggyBank,
+  ArrowLeftRight,
+  Layers,
+  Bookmark,
+  BookmarkPlus,
+  Save,
+  FileText
 } from 'lucide-react';
 
 export const BorrowerDashboard: React.FC = () => {
@@ -44,7 +59,7 @@ export const BorrowerDashboard: React.FC = () => {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<
-    'home' | 'calculator' | 'suggestions' | 'repayments' | 'loan' | 'ai' | 'history' | 'profile'
+    'home' | 'calculator' | 'suggestions' | 'repayments' | 'loan' | 'ai' | 'history' | 'profile' | 'transactions' | 'budgets'
   >('home');
 
   // Core Data States
@@ -105,6 +120,50 @@ export const BorrowerDashboard: React.FC = () => {
   const [sendingChat, setSendingChat] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // --- NOTIFICATION DRAWER STATE ---
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  // --- PREPAYMENT & COMPARISON STATE ---
+  const [extraMonthlyEmi, setExtraMonthlyEmi] = useState<number>(1000);
+  const [lumpSumPrepayment, setLumpSumPrepayment] = useState<number>(10000);
+  const [lumpSumMonth, setLumpSumMonth] = useState<number>(3);
+  const [prepaymentResult, setPrepaymentResult] = useState<PrepaymentSimulationResult | null>(null);
+  const [simulatingPrepay, setSimulatingPrepay] = useState(false);
+
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [planBAmount, setPlanBAmount] = useState<number>(60000);
+  const [planBRate, setPlanBRate] = useState<number>(14.0);
+  const [planBTenure, setPlanBTenure] = useState<number>(18);
+  const [comparisonResult, setComparisonResult] = useState<ScenarioComparisonResult | null>(null);
+  const [comparing, setComparing] = useState(false);
+
+  const [savedScenarios, setSavedScenarios] = useState<SavedLoanScenario[]>([]);
+  const [scenarioTitle, setScenarioTitle] = useState('');
+  const [savingScenario, setSavingScenario] = useState(false);
+
+  // --- LOAN APPLICATION DRAFT STATE ---
+  const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  // Check for saved draft and saved scenarios on mount
+  useEffect(() => {
+    const checkDraftAndScenarios = async () => {
+      try {
+        const [draftRes, scRes] = await Promise.all([
+          api.get('/loans/draft').catch(() => ({ data: null })),
+          api.get('/loans/saved-scenarios').catch(() => ({ data: [] }))
+        ]);
+        if (draftRes.data) setHasSavedDraft(true);
+        if (scRes.data) setSavedScenarios(scRes.data);
+      } catch (e) {
+        // ignore
+      }
+    };
+    checkDraftAndScenarios();
+  }, []);
 
   // Fetch all initial data
   const fetchDashboardData = async () => {
@@ -324,6 +383,167 @@ export const BorrowerDashboard: React.FC = () => {
     }
   };
 
+  // Save Loan Draft
+  const handleSaveLoanDraft = async () => {
+    setIsSavingDraft(true);
+    setDraftNotice(null);
+    try {
+      await api.post('/loans/draft', {
+        amount: Number(applyAmount),
+        tenureMonths: Number(applyTenure),
+        limitBal: Number(limitBal),
+        age: Number(age),
+        education: Number(education),
+        marriage: Number(marriage),
+        sex: Number(sex),
+        payHistory,
+        billAmts,
+        payAmts
+      });
+      setHasSavedDraft(true);
+      setDraftNotice('Draft application securely saved to database! You can resume anytime.');
+      setTimeout(() => setDraftNotice(null), 5000);
+    } catch (err: any) {
+      setDraftNotice('Failed to save draft: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  // Resume Loan Draft
+  const handleResumeLoanDraft = async () => {
+    try {
+      const res = await api.get('/loans/draft');
+      if (res.data?.formData) {
+        const d = res.data.formData;
+        if (d.amount) setApplyAmount(String(d.amount));
+        if (d.tenureMonths) setApplyTenure(String(d.tenureMonths));
+        if (d.limitBal) setLimitBal(String(d.limitBal));
+        if (d.age) setAge(String(d.age));
+        if (d.education) setEducation(String(d.education));
+        if (d.marriage) setMarriage(String(d.marriage));
+        if (d.sex) setSex(String(d.sex));
+        if (d.payHistory) setPayHistory(d.payHistory);
+        if (d.billAmts) setBillAmts(d.billAmts);
+        if (d.payAmts) setPayAmts(d.payAmts);
+        setDraftNotice('Saved application draft loaded into form.');
+        setTimeout(() => setDraftNotice(null), 5000);
+      }
+    } catch (err: any) {
+      setDraftNotice('Failed to load draft: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  // Discard Loan Draft
+  const handleDiscardLoanDraft = async () => {
+    try {
+      await api.delete('/loans/draft');
+      setHasSavedDraft(false);
+      setDraftNotice('Saved draft removed.');
+      setTimeout(() => setDraftNotice(null), 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Simulate Prepayment
+  const handleSimulatePrepayment = async () => {
+    setSimulatingPrepay(true);
+    try {
+      const res = await api.post('/loans/simulate-prepayment', {
+        principal: calcAmount,
+        annualRate: calcRate,
+        tenureMonths: calcTenure,
+        extraMonthlyPayment: Number(extraMonthlyEmi) || 0,
+        lumpSumPrepayment: Number(lumpSumPrepayment) || 0,
+        lumpSumMonth: Number(lumpSumMonth) || 1
+      });
+      setPrepaymentResult(res.data);
+    } catch (err: any) {
+      console.error('Prepayment simulation error:', err);
+    } finally {
+      setSimulatingPrepay(false);
+    }
+  };
+
+  // Compare Scenarios
+  const handleCompareScenarios = async () => {
+    setComparing(true);
+    try {
+      const res = await api.post('/loans/compare-scenarios', {
+        planA: {
+          principal: calcAmount,
+          annualRate: calcRate,
+          tenureMonths: calcTenure
+        },
+        planB: {
+          principal: planBAmount,
+          annualRate: planBRate,
+          tenureMonths: planBTenure
+        }
+      });
+      setComparisonResult(res.data);
+    } catch (err: any) {
+      console.error('Comparison error:', err);
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  // Save Scenario
+  const handleSaveScenario = async () => {
+    if (!calcResult || savingScenario) return;
+    setSavingScenario(true);
+    try {
+      const title = scenarioTitle.trim() || `Plan ₹${calcAmount.toLocaleString('en-IN')} (${calcTenure}m @ ${calcRate}%)`;
+      await api.post('/loans/saved-scenarios', {
+        name: title,
+        amount: calcAmount,
+        annualRate: calcRate,
+        tenureMonths: calcTenure,
+        emi: calcResult.emi,
+        totalInterest: calcResult.totalInterest,
+        totalPayable: calcResult.totalPayable
+      });
+      setScenarioTitle('');
+      const scRes = await api.get('/loans/saved-scenarios');
+      setSavedScenarios(scRes.data);
+    } catch (err: any) {
+      console.error('Save scenario error:', err);
+    } finally {
+      setSavingScenario(false);
+    }
+  };
+
+  // Delete Scenario
+  const handleDeleteScenario = async (id: string) => {
+    try {
+      await api.delete(`/loans/saved-scenarios/${id}`);
+      setSavedScenarios(prev => prev.filter(s => s.id !== id));
+    } catch (err) {
+      console.error('Delete scenario error:', err);
+    }
+  };
+
+  // Download Monthly Financial Summary
+  const handleDownloadMonthlySummary = async () => {
+    setDownloadingReport(true);
+    try {
+      const res = await api.get('/reports/monthly-summary?format=json');
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(res.data, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `Spendify_Financial_Summary_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error('Download report error:', err);
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   const activeLoan = loans.find(l => l.status === 'ACTIVE' || l.status === 'APPROVED');
   const latestLoan = loans.length > 0 ? loans[loans.length - 1] : null;
 
@@ -361,14 +581,28 @@ export const BorrowerDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => setIsNotificationOpen(true)}
+            className="relative p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm"
+            title="Notifications & Dynamic Warnings"
+          >
+            <Bell size={18} />
+            {alerts.filter(a => !a.resolved).length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white font-extrabold text-[10px] flex items-center justify-center animate-pulse border-2 border-[#0B0F19]">
+                {alerts.filter(a => !a.resolved).length}
+              </span>
+            )}
+          </button>
+
           <div className="text-right hidden sm:block">
             <span className="text-sm font-bold text-white block">{user?.name}</span>
             <span className="text-[11px] text-slate-400 font-mono">{user?.email}</span>
           </div>
           <button
             onClick={() => setActiveTab('profile')}
-            className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center font-bold text-white shadow-md text-sm cursor-pointer"
+            className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-cyan-600 flex items-center justify-center font-bold text-white shadow-md text-sm cursor-pointer hover:ring-2 hover:ring-emerald-400 transition-all"
           >
             {user?.name.charAt(0)}
           </button>
@@ -390,6 +624,16 @@ export const BorrowerDashboard: React.FC = () => {
                 </span>
                 <h1 className="text-2xl md:text-3xl font-black text-white">Hello, {user?.name.split(' ')[0]} 👋</h1>
                 <p className="text-slate-400 text-sm mt-0.5">Your live cashflow, credit telemetry, and affordability status.</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadMonthlySummary}
+                    disabled={downloadingReport}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-750 border border-slate-700/80 text-xs font-bold text-slate-200 hover:text-white transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Download size={13} className="text-emerald-400" />
+                    {downloadingReport ? 'Generating Summary...' : 'Download Monthly Financial Report'}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
@@ -485,17 +729,43 @@ export const BorrowerDashboard: React.FC = () => {
             </div>
 
             {/* Quick Action Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <button
+                onClick={() => setActiveTab('transactions')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                  <Receipt size={22} />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white text-md block">Transactions</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Income, expenses & CSV import/export</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('budgets')}
+                className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
+              >
+                <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                  <PiggyBank size={22} />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white text-md block">Budgets & Goals</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Category limits & savings targets</span>
+                </div>
+              </button>
+
               <button
                 onClick={() => setActiveTab('calculator')}
                 className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
               >
-                <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
                   <Calculator size={22} />
                 </div>
                 <div>
                   <span className="font-extrabold text-white text-md block">Loan Calculator</span>
-                  <span className="text-xs text-slate-400 mt-0.5 block">Reducing-balance EMI & schedules</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Reducing-balance EMI & prepayments</span>
                 </div>
               </button>
 
@@ -503,7 +773,7 @@ export const BorrowerDashboard: React.FC = () => {
                 onClick={() => setActiveTab('suggestions')}
                 className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
               >
-                <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-400 group-hover:scale-110 transition-transform">
                   <Compass size={22} />
                 </div>
                 <div>
@@ -516,7 +786,7 @@ export const BorrowerDashboard: React.FC = () => {
                 onClick={() => setActiveTab('repayments')}
                 className="p-5 rounded-3xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 transition-all flex flex-col items-start gap-3 text-left group cursor-pointer"
               >
-                <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
+                <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform">
                   <CalendarCheck size={22} />
                 </div>
                 <div>
@@ -534,7 +804,7 @@ export const BorrowerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-extrabold text-white text-md block">Gemini AI</span>
-                  <span className="text-xs text-slate-400 mt-0.5 block">Natural-language advisory</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Natural-language financial advisor</span>
                 </div>
               </button>
             </div>
@@ -791,6 +1061,275 @@ export const BorrowerDashboard: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* ─── PREPAYMENT & ACCELERATED PAYOFF SIMULATOR ─── */}
+            <div className="p-6 md:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <TrendingUp size={14} /> Accelerated Payoff Simulator
+                  </span>
+                  <h3 className="text-xl font-black text-white mt-1">Prepayment & Tenure Reduction Calculator</h3>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Simulate how extra monthly contributions or lump-sum prepayments shrink your debt faster and slash interest charges.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">Extra Monthly EMI (₹)</label>
+                    <span className="font-mono text-emerald-400 font-bold">₹{extraMonthlyEmi.toLocaleString('en-IN')}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="20000"
+                    step="500"
+                    value={extraMonthlyEmi}
+                    onChange={e => setExtraMonthlyEmi(Number(e.target.value))}
+                    className="w-full accent-emerald-500 cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    value={extraMonthlyEmi}
+                    onChange={e => setExtraMonthlyEmi(Math.max(0, Number(e.target.value)))}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">One-Time Lump Sum (₹)</label>
+                    <span className="font-mono text-cyan-400 font-bold">₹{lumpSumPrepayment.toLocaleString('en-IN')}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={calcAmount}
+                    step="1000"
+                    value={lumpSumPrepayment}
+                    onChange={e => setLumpSumPrepayment(Number(e.target.value))}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                  <input
+                    type="number"
+                    value={lumpSumPrepayment}
+                    onChange={e => setLumpSumPrepayment(Math.max(0, Number(e.target.value)))}
+                    className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <label className="font-bold text-slate-300">Lump Sum at Month #</label>
+                    <span className="font-mono text-purple-400 font-bold">Month {lumpSumMonth}</span>
+                  </div>
+                  <select
+                    value={lumpSumMonth}
+                    onChange={e => setLumpSumMonth(Number(e.target.value))}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                  >
+                    {Array.from({ length: Math.min(calcTenure, 24) }, (_, i) => i + 1).map(m => (
+                      <option key={m} value={m}>Month {m}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    disabled={simulatingPrepay}
+                    onClick={handleSimulatePrepayment}
+                    className="py-2.5 mt-auto rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 hover:brightness-110 disabled:opacity-50"
+                  >
+                    {simulatingPrepay ? 'Calculating...' : 'Simulate Accelerated Payoff'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Prepayment Results */}
+              {prepaymentResult && (
+                <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col gap-4 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                    <CheckCircle2 size={16} /> Prepayment Simulation Outcome
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400 block">Revised Tenure</span>
+                      <span className="text-lg font-black text-white">{prepaymentResult.newTenureMonths} Months</span>
+                      <span className="text-[11px] text-emerald-400 block mt-0.5">({prepaymentResult.tenureMonthsSaved} mo faster!)</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400 block">Interest Saved</span>
+                      <span className="text-lg font-black text-emerald-400">₹{prepaymentResult.interestSaved.toLocaleString('en-IN')}</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">vs standard plan</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400 block">New Total Interest</span>
+                      <span className="text-lg font-black text-cyan-400">₹{prepaymentResult.newTotalInterest.toLocaleString('en-IN')}</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">down from ₹{prepaymentResult.originalTotalInterest.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+                      <span className="text-slate-400 block">New Payoff Date</span>
+                      <span className="text-sm font-bold text-white mt-1 block">{prepaymentResult.estimatedPayoffDate}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ─── SIDE-BY-SIDE LOAN SCENARIO COMPARISON ─── */}
+            <div className="p-6 md:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 shadow-xl flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <ArrowLeftRight size={14} /> Side-by-Side Comparison Toolkit
+                  </span>
+                  <h3 className="text-xl font-black text-white mt-1">Compare Plan A vs Plan B</h3>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    Contrast different principal sizes, interest rates, and loan terms side-by-side to understand financial trade-offs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCompareOpen(!compareOpen)}
+                  className="px-4 py-2 rounded-xl bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:text-white text-xs font-bold transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  {compareOpen ? 'Collapse Comparison' : 'Configure Plan B'}
+                </button>
+              </div>
+
+              {compareOpen && (
+                <div className="flex flex-col gap-5 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-950/50 border border-slate-800">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-300">Plan B Principal (₹)</label>
+                      <input
+                        type="number"
+                        value={planBAmount}
+                        onChange={e => setPlanBAmount(Number(e.target.value))}
+                        className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-300">Plan B Interest Rate (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={planBRate}
+                        onChange={e => setPlanBRate(Number(e.target.value))}
+                        className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold text-slate-300">Plan B Tenure (Months)</label>
+                      <select
+                        value={planBTenure}
+                        onChange={e => setPlanBTenure(Number(e.target.value))}
+                        className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                      >
+                        {[6, 12, 18, 24, 36].map(t => (
+                          <option key={t} value={t}>{t} Months</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={comparing}
+                    onClick={handleCompareScenarios}
+                    className="py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-600/20 disabled:opacity-50"
+                  >
+                    <ArrowLeftRight size={15} />
+                    {comparing ? 'Comparing...' : 'Run Side-by-Side Comparison'}
+                  </button>
+
+                  {comparisonResult && (
+                    <div className="flex flex-col gap-4 mt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Plan A */}
+                        <div className="p-5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 flex flex-col gap-3 font-mono text-xs">
+                          <span className="font-extrabold text-emerald-400 text-sm">Plan A (Current Calculator)</span>
+                          <div className="flex justify-between"><span className="text-slate-400">Principal:</span><span className="text-white font-bold">₹{comparisonResult.scenarioA.principal.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Rate & Tenure:</span><span className="text-slate-300">{comparisonResult.scenarioA.annualRate}% / {comparisonResult.scenarioA.tenureMonths}m</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Monthly EMI:</span><span className="text-emerald-400 font-black text-sm">₹{comparisonResult.scenarioA.emi.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Total Interest:</span><span className="text-cyan-400 font-bold">₹{comparisonResult.scenarioA.totalInterest.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Total Payable:</span><span className="text-white font-bold">₹{comparisonResult.scenarioA.totalPayable.toLocaleString('en-IN')}</span></div>
+                        </div>
+
+                        {/* Plan B */}
+                        <div className="p-5 rounded-2xl bg-slate-950/70 border border-purple-500/30 flex flex-col gap-3 font-mono text-xs">
+                          <span className="font-extrabold text-purple-400 text-sm">Plan B (Alternative)</span>
+                          <div className="flex justify-between"><span className="text-slate-400">Principal:</span><span className="text-white font-bold">₹{comparisonResult.scenarioB.principal.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Rate & Tenure:</span><span className="text-slate-300">{comparisonResult.scenarioB.annualRate}% / {comparisonResult.scenarioB.tenureMonths}m</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Monthly EMI:</span><span className="text-purple-400 font-black text-sm">₹{comparisonResult.scenarioB.emi.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Total Interest:</span><span className="text-cyan-400 font-bold">₹{comparisonResult.scenarioB.totalInterest.toLocaleString('en-IN')}</span></div>
+                          <div className="flex justify-between"><span className="text-slate-400">Total Payable:</span><span className="text-white font-bold">₹{comparisonResult.scenarioB.totalPayable.toLocaleString('en-IN')}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Trade-off Summary */}
+                      <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
+                        <span className="font-bold text-white block mb-1">Financial Trade-off Analysis:</span>
+                        <p className="text-slate-300 leading-relaxed">{comparisonResult.summary}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Save Scenario Bar */}
+              <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex-1 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Scenario label (e.g., Home Renovation Plan 12m)"
+                    value={scenarioTitle}
+                    onChange={e => setScenarioTitle(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs placeholder-slate-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={savingScenario}
+                  onClick={handleSaveScenario}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  <BookmarkPlus size={14} className="text-emerald-400" />
+                  {savingScenario ? 'Saving...' : 'Save Scenario'}
+                </button>
+              </div>
+
+              {/* Saved Scenarios List */}
+              {savedScenarios.length > 0 && (
+                <div className="flex flex-col gap-2 mt-1">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    My Saved Scenarios ({savedScenarios.length})
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedScenarios.map(sc => (
+                      <div key={sc.id} className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                        <div>
+                          <span className="font-bold text-white block">{sc.name}</span>
+                          <span className="text-slate-400 font-mono text-[11px]">
+                            ₹{sc.amount.toLocaleString('en-IN')} @ {sc.annualRate}% · {sc.tenureMonths}m · EMI: ₹{sc.emi.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteScenario(sc.id)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 transition-colors"
+                          title="Delete scenario"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1133,6 +1672,38 @@ export const BorrowerDashboard: React.FC = () => {
                   <p className="text-slate-400 text-sm mt-0.5">Underwriting powered by real XGBoost Machine Learning model.</p>
                 </div>
 
+                {draftNotice && (
+                  <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 rounded-2xl text-xs font-semibold flex items-center justify-between">
+                    <span>{draftNotice}</span>
+                    <button onClick={() => setDraftNotice(null)} className="text-emerald-400 hover:text-white cursor-pointer"><X size={14} /></button>
+                  </div>
+                )}
+
+                {hasSavedDraft && (
+                  <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-cyan-200">
+                      <Bookmark size={16} className="text-cyan-400 shrink-0" />
+                      <span>You have a saved loan application draft in your account.</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResumeLoanDraft}
+                        className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold text-xs transition-all cursor-pointer shadow-sm"
+                      >
+                        Resume Draft
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDiscardLoanDraft}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-all cursor-pointer"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {applyError && (
                   <div className="p-4 bg-red-950/40 border border-red-500/40 text-red-300 rounded-xl text-xs font-medium">
                     {applyError}
@@ -1226,12 +1797,23 @@ export const BorrowerDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-4 mt-2 rounded-xl font-extrabold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black hover:brightness-110 active:scale-98 shadow-lg shadow-emerald-500/20 transition-all text-sm cursor-pointer"
-                  >
-                    Submit Application for ML Underwriting
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3 mt-2">
+                    <button
+                      type="button"
+                      disabled={isSavingDraft}
+                      onClick={handleSaveLoanDraft}
+                      className="py-4 px-6 rounded-xl font-bold bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white border border-slate-700 transition-all text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Save size={16} />
+                      {isSavingDraft ? 'Saving Draft...' : 'Save Draft (Resume Later)'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-4 rounded-xl font-extrabold bg-gradient-to-r from-emerald-500 to-cyan-500 text-black hover:brightness-110 active:scale-98 shadow-lg shadow-emerald-500/20 transition-all text-sm cursor-pointer"
+                    >
+                      Submit Application for ML Underwriting
+                    </button>
+                  </div>
                 </form>
               </div>
             )}
@@ -1503,6 +2085,20 @@ export const BorrowerDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* ─── TAB: TRANSACTIONS & CASHFLOW ─── */}
+        {activeTab === 'transactions' && (
+          <div className="animate-fadeIn">
+            <TransactionsTab />
+          </div>
+        )}
+
+        {/* ─── TAB: BUDGETS & SAVINGS GOALS ─── */}
+        {activeTab === 'budgets' && (
+          <div className="animate-fadeIn">
+            <BudgetsTab />
+          </div>
+        )}
+
       </main>
 
       {/* ─── SIMULATED PAYMENT MODAL (PHASE 7) ─── */}
@@ -1639,71 +2235,103 @@ export const BorrowerDashboard: React.FC = () => {
       )}
 
       {/* Bottom Sticky Tab Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F19]/95 backdrop-blur-xl border-t border-slate-800/80 py-3 shadow-2xl">
-        <div className="max-w-xl mx-auto flex items-center justify-around px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F19]/95 backdrop-blur-xl border-t border-slate-800/80 py-2.5 shadow-2xl">
+        <div className="max-w-3xl mx-auto flex items-center justify-around px-2 overflow-x-auto no-scrollbar gap-1">
           
           <button 
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'home' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <HomeIcon size={20} />
+            <HomeIcon size={18} />
             <span className="text-[10px]">Home</span>
           </button>
 
           <button 
+            onClick={() => setActiveTab('transactions')}
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'transactions' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Receipt size={18} />
+            <span className="text-[10px]">Txns</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('budgets')}
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'budgets' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <PiggyBank size={18} />
+            <span className="text-[10px]">Budgets</span>
+          </button>
+
+          <button 
             onClick={() => setActiveTab('calculator')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'calculator' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calculator size={20} />
-            <span className="text-[10px]">Calculator</span>
+            <Calculator size={18} />
+            <span className="text-[10px]">Calc</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('suggestions')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'suggestions' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Compass size={20} />
-            <span className="text-[10px]">Affordability</span>
+            <Compass size={18} />
+            <span className="text-[10px]">Afford</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('repayments')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'repayments' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <CalendarCheck size={20} />
-            <span className="text-[10px]">Repayments</span>
+            <CalendarCheck size={18} />
+            <span className="text-[10px]">Pay</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('loan')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'loan' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <CreditCard size={20} />
+            <CreditCard size={18} />
             <span className="text-[10px]">Apply</span>
           </button>
 
           <button 
             onClick={() => setActiveTab('ai')}
-            className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition-all cursor-pointer shrink-0 ${
               activeTab === 'ai' ? 'text-emerald-400 font-bold scale-105' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <MessageSquare size={20} />
-            <span className="text-[10px]">AI Chat</span>
+            <MessageSquare size={18} />
+            <span className="text-[10px]">AI</span>
           </button>
 
         </div>
       </nav>
+
+      {/* ─── NOTIFICATION CENTRE DRAWER ─── */}
+      <NotificationDrawer
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        alerts={alerts}
+        onRefreshAlerts={fetchDashboardData}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setIsNotificationOpen(false);
+        }}
+      />
 
     </div>
   );

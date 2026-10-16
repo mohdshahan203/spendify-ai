@@ -10,7 +10,9 @@ import {
   calculateReducingBalanceEMI, 
   generateAmortisationSchedule, 
   evaluateAffordabilityScenarios, 
-  evaluateFinancialWarnings 
+  evaluateFinancialWarnings,
+  simulatePrepayment,
+  compareLoanScenarios
 } from '../src/services/loanMathService';
 import { geminiService } from '../src/services/geminiService';
 import { dbService } from '../src/services/dbService';
@@ -284,6 +286,119 @@ async function runAllTests() {
     } catch (err: any) {
       console.warn('  ⚠️ Live Gemini call note:', err.message);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // TEST 7: PREPAYMENT & ACCELERATED PAYOFF SIMULATION MATH
+  // ─────────────────────────────────────────────────────────
+  console.log('\n--- TEST GROUP 7: Prepayment & Accelerated Payoff Simulation Math ---');
+
+  // Baseline: ₹50,000 @ 12% for 12 months. Monthly EMI is ₹4,442.44
+  // Simulation: Extra ₹1,000/month
+  const prepaySim1 = simulatePrepayment({
+    principal: 50000,
+    annualRate: 12,
+    tenureMonths: 12,
+    extraMonthlyPayment: 1000
+  });
+
+  assert(prepaySim1.newTenureMonths < 12, `Extra ₹1,000/mo reduces tenure below 12 months (Observed: ${prepaySim1.newTenureMonths} mo)`);
+  assert(prepaySim1.tenureMonthsSaved > 0, `Tenure months saved is positive (Saved: ${prepaySim1.tenureMonthsSaved} months)`);
+  assert(prepaySim1.interestSaved > 0, `Interest saved is positive (Saved: ₹${prepaySim1.interestSaved})`);
+  assert(prepaySim1.newTotalInterest < prepaySim1.originalTotalInterest, 'New total interest is strictly lower than baseline total interest');
+
+  // Simulation: Lump-sum prepayment of ₹15,000 at month 3
+  const prepaySim2 = simulatePrepayment({
+    principal: 50000,
+    annualRate: 12,
+    tenureMonths: 12,
+    lumpSumPrepayment: 15000,
+    lumpSumMonth: 3
+  });
+  assert(prepaySim2.tenureMonthsSaved >= 3, `Lump sum of ₹15,000 at month 3 saves at least 3 months (Observed: ${prepaySim2.tenureMonthsSaved} mo saved)`);
+  assert(prepaySim2.interestSaved > 500, `Lump sum prepayment saves substantial interest (Saved: ₹${prepaySim2.interestSaved})`);
+
+  // ─────────────────────────────────────────────────────────
+  // TEST 8: SIDE-BY-SIDE LOAN SCENARIO COMPARISON
+  // ─────────────────────────────────────────────────────────
+  console.log('\n--- TEST GROUP 8: Side-by-Side Loan Scenario Comparison ---');
+
+  // Plan A: ₹50,000 @ 12% for 12 months (Shorter tenure, higher EMI, lower total interest)
+  // Plan B: ₹50,000 @ 14% for 24 months (Longer tenure, lower EMI, higher total interest)
+  const comparison = compareLoanScenarios(
+    { principal: 50000, annualRate: 12, tenureMonths: 12 },
+    { principal: 50000, annualRate: 14, tenureMonths: 24 }
+  );
+
+  assert(comparison.scenarioA.emi > comparison.scenarioB.emi, `Plan A EMI (₹${comparison.scenarioA.emi}) is higher than Plan B EMI (₹${comparison.scenarioB.emi}) due to shorter tenure`);
+  assert(comparison.scenarioB.totalInterest > comparison.scenarioA.totalInterest, `Plan B Total Interest (₹${comparison.scenarioB.totalInterest}) is higher than Plan A (₹${comparison.scenarioA.totalInterest}) due to extended compounding`);
+  assert(comparison.emiDifference > 0, `EMI difference is calculated correctly (₹${comparison.emiDifference})`);
+  assert(comparison.summary.length > 20, 'Human-readable trade-off summary is generated');
+
+  // ─────────────────────────────────────────────────────────
+  // TEST 9: FINANCIAL MANAGEMENT & PERSISTENCE (CRUD & BUDGETS)
+  // ─────────────────────────────────────────────────────────
+  console.log('\n--- TEST GROUP 9: Transactions, Budgets, Savings Goals & Drafts ---');
+
+  const testUser = await dbService.user.findUnique({ where: { email: 'borrower@spendify.com' } });
+  assert(!!testUser, 'Borrower user exists for financial management tests');
+
+  if (testUser) {
+    // 9A: Transactions
+    const userTxns = await dbService.userTransaction.findMany({ where: { userId: testUser.id } });
+    assert(userTxns.length >= 7, `Borrower has at least 7 seeded transactions (Found: ${userTxns.length})`);
+    
+    // Add a test income transaction
+    const newTx = await dbService.userTransaction.create({
+      data: {
+        userId: testUser.id,
+        type: 'INCOME',
+        amount: 8500,
+        category: 'Freelance & Consulting',
+        description: 'Frontend React consulting payout',
+        paymentMethod: 'BANK_TRANSFER',
+        date: new Date().toISOString().slice(0, 10),
+        isRecurring: false,
+        isVerified: true
+      }
+    });
+    assert(!!newTx.id, 'Successfully created new income transaction');
+
+    // Clean up test transaction
+    await dbService.userTransaction.delete({ where: { id: newTx.id } });
+    const afterDeleteTxns = await dbService.userTransaction.findMany({ where: { userId: testUser.id } });
+    assert(!afterDeleteTxns.find((t: any) => t.id === newTx.id), 'Successfully deleted transaction with authorization');
+
+    // 9B: Budgets & limits
+    const budgets = await dbService.budget.findMany({ where: { userId: testUser.id } });
+    assert(budgets.length >= 4, `Borrower has category budgets configured (Found: ${budgets.length})`);
+    
+    const groceryBudget = budgets.find((b: any) => b.category.includes('Groceries'));
+    assert(!!groceryBudget, 'Groceries & Household budget exists');
+    if (groceryBudget) {
+      assert(groceryBudget.limitAmount > 0, `Grocery budget limit is positive (₹${groceryBudget.limitAmount})`);
+    }
+
+    // 9C: Savings Goals
+    const goals = await dbService.savingsGoal.findMany({ where: { userId: testUser.id } });
+    assert(goals.length >= 2, `Borrower has at least 2 savings goals (Found: ${goals.length})`);
+    const emergencyFund = goals.find((g: any) => g.title.includes('Emergency'));
+    assert(!!emergencyFund, 'Emergency Safety Fund goal exists');
+    if (emergencyFund) {
+      assert(emergencyFund.targetAmount > emergencyFund.currentAmount, 'Emergency goal progress is tracked');
+    }
+
+    // 9D: Saved Loan Scenarios
+    const savedScenarios = await dbService.savedScenario.findMany({ where: { userId: testUser.id } });
+    assert(savedScenarios.length >= 1, `Borrower has seeded saved scenario (Found: ${savedScenarios.length})`);
+
+    // 9E: Loan Application Draft persistence
+    const draft = await dbService.loanDraft.upsert({
+      where: { userId: testUser.id },
+      update: { amount: 75000, tenureMonths: 18, notes: 'Automated test draft verification' },
+      create: { amount: 75000, tenureMonths: 18, notes: 'Automated test draft verification' }
+    });
+    assert(draft.amount === 75000 && draft.tenureMonths === 18, 'Loan application draft persisted and retrieved successfully');
   }
 
   // ─────────────────────────────────────────────────────────

@@ -91,3 +91,37 @@ export const resolveAlert = async (req: AuthenticatedRequest, res: Response) => 
     res.status(500).json({ error: 'Failed to resolve alert.' });
   }
 };
+
+export const markAllAlertsRead = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized.' });
+
+    // Mark all persisted alerts as resolved
+    const alerts = await dbService.alert.findMany({ where: { userId } });
+    for (const a of alerts) {
+      await dbService.alert.update({ where: { id: a.id }, data: { resolved: true } });
+    }
+
+    res.status(200).json({ message: 'All notifications marked as read.' });
+  } catch (error: any) {
+    console.error('markAllAlertsRead error:', error);
+    res.status(500).json({ error: 'Failed to mark all alerts as read.' });
+  }
+};
+
+export const dismissAlert = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Alert ID is required.' });
+
+    try {
+      await dbService.alert.update({ where: { id }, data: { resolved: true } });
+    } catch {}
+
+    res.status(200).json({ message: 'Notification dismissed.' });
+  } catch (error: any) {
+    console.error('dismissAlert error:', error);
+    res.status(500).json({ error: 'Failed to dismiss alert.' });
+  }
+};

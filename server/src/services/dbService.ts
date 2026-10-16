@@ -490,5 +490,191 @@ export const dbService = {
       mockDb.auditLogs.push(newLog);
       return newLog;
     }
+  },
+
+  // --- USER TRANSACTION & EXPENSE TRACKER OPERATIONS ---
+  userTransaction: {
+    findMany: async (args?: { where?: { userId?: string; type?: string; category?: string } }) => {
+      let list = mockDb.userTransactions;
+      if (args?.where?.userId) {
+        list = list.filter(t => t.userId === args.where!.userId);
+      }
+      if (args?.where?.type) {
+        list = list.filter(t => t.type === args.where!.type);
+      }
+      if (args?.where?.category) {
+        list = list.filter(t => t.category === args.where!.category);
+      }
+      return list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
+    },
+    findUnique: async (args: { where: { id: string } }) => {
+      return mockDb.userTransactions.find(t => t.id === args.where.id) || null;
+    },
+    create: async (args: { data: any }) => {
+      const newTx = {
+        id: 'tx-' + Math.random().toString(36).substring(2, 11),
+        createdAt: new Date(),
+        ...args.data
+      };
+      mockDb.userTransactions.push(newTx);
+      return newTx;
+    },
+    update: async (args: { where: { id: string }; data: any }) => {
+      const idx = mockDb.userTransactions.findIndex(t => t.id === args.where.id);
+      if (idx !== -1) {
+        mockDb.userTransactions[idx] = { ...mockDb.userTransactions[idx], ...args.data };
+        return mockDb.userTransactions[idx];
+      }
+      throw new Error('Transaction not found');
+    },
+    delete: async (args: { where: { id: string } }) => {
+      const idx = mockDb.userTransactions.findIndex(t => t.id === args.where.id);
+      if (idx !== -1) {
+        const deleted = mockDb.userTransactions.splice(idx, 1)[0];
+        return deleted;
+      }
+      throw new Error('Transaction not found');
+    }
+  },
+
+  // --- BUDGET OPERATIONS ---
+  budget: {
+    findMany: async (args?: { where?: { userId?: string; month?: string } }) => {
+      let list = mockDb.budgets;
+      if (args?.where?.userId) {
+        list = list.filter(b => b.userId === args.where!.userId);
+      }
+      if (args?.where?.month) {
+        list = list.filter(b => b.month === args.where!.month);
+      }
+      return list;
+    },
+    upsert: async (args: { where: { userId_month_category: { userId: string; month: string; category: string } }; update: any; create: any }) => {
+      const { userId, month, category } = args.where.userId_month_category;
+      const idx = mockDb.budgets.findIndex(b => b.userId === userId && b.month === month && b.category === category);
+      if (idx !== -1) {
+        mockDb.budgets[idx] = { ...mockDb.budgets[idx], ...args.update };
+        return mockDb.budgets[idx];
+      } else {
+        const newBudget = {
+          id: 'bgt-' + Math.random().toString(36).substring(2, 11),
+          userId,
+          month,
+          category,
+          createdAt: new Date(),
+          ...args.create
+        };
+        mockDb.budgets.push(newBudget);
+        return newBudget;
+      }
+    },
+    delete: async (args: { where: { id: string } }) => {
+      const idx = mockDb.budgets.findIndex(b => b.id === args.where.id);
+      if (idx !== -1) {
+        return mockDb.budgets.splice(idx, 1)[0];
+      }
+      throw new Error('Budget not found');
+    }
+  },
+
+  // --- SAVINGS GOALS OPERATIONS ---
+  savingsGoal: {
+    findMany: async (args?: { where?: { userId?: string; isArchived?: boolean } }) => {
+      let list = mockDb.savingsGoals;
+      if (args?.where?.userId) {
+        list = list.filter(g => g.userId === args.where!.userId);
+      }
+      if (args?.where?.isArchived !== undefined) {
+        list = list.filter(g => g.isArchived === args.where!.isArchived);
+      }
+      return list.sort((a, b) => new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime());
+    },
+    findUnique: async (args: { where: { id: string } }) => {
+      return mockDb.savingsGoals.find(g => g.id === args.where.id) || null;
+    },
+    create: async (args: { data: any }) => {
+      const newGoal = {
+        id: 'goal-' + Math.random().toString(36).substring(2, 11),
+        currentAmount: 0,
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...args.data
+      };
+      mockDb.savingsGoals.push(newGoal);
+      return newGoal;
+    },
+    update: async (args: { where: { id: string }; data: any }) => {
+      const idx = mockDb.savingsGoals.findIndex(g => g.id === args.where.id);
+      if (idx !== -1) {
+        mockDb.savingsGoals[idx] = { ...mockDb.savingsGoals[idx], ...args.data, updatedAt: new Date() };
+        return mockDb.savingsGoals[idx];
+      }
+      throw new Error('Savings goal not found');
+    },
+    delete: async (args: { where: { id: string } }) => {
+      const idx = mockDb.savingsGoals.findIndex(g => g.id === args.where.id);
+      if (idx !== -1) {
+        return mockDb.savingsGoals.splice(idx, 1)[0];
+      }
+      throw new Error('Savings goal not found');
+    }
+  },
+
+  // --- SAVED LOAN SCENARIOS OPERATIONS ---
+  savedScenario: {
+    findMany: async (args?: { where?: { userId?: string } }) => {
+      let list = mockDb.savedScenarios;
+      if (args?.where?.userId) {
+        list = list.filter(s => s.userId === args.where!.userId);
+      }
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+    create: async (args: { data: any }) => {
+      const newScenario = {
+        id: 'scen-' + Math.random().toString(36).substring(2, 11),
+        createdAt: new Date(),
+        ...args.data
+      };
+      mockDb.savedScenarios.push(newScenario);
+      return newScenario;
+    },
+    delete: async (args: { where: { id: string } }) => {
+      const idx = mockDb.savedScenarios.findIndex(s => s.id === args.where.id);
+      if (idx !== -1) {
+        return mockDb.savedScenarios.splice(idx, 1)[0];
+      }
+      throw new Error('Scenario not found');
+    }
+  },
+
+  // --- LOAN APPLICATION DRAFT OPERATIONS ---
+  loanDraft: {
+    findUnique: async (args: { where: { userId: string } }) => {
+      return mockDb.loanDrafts.find(d => d.userId === args.where.userId) || null;
+    },
+    upsert: async (args: { where: { userId: string }; create: any; update: any }) => {
+      const idx = mockDb.loanDrafts.findIndex(d => d.userId === args.where.userId);
+      if (idx !== -1) {
+        mockDb.loanDrafts[idx] = { ...mockDb.loanDrafts[idx], ...args.update, updatedAt: new Date() };
+        return mockDb.loanDrafts[idx];
+      } else {
+        const newDraft = {
+          id: 'draft-' + Math.random().toString(36).substring(2, 11),
+          userId: args.where.userId,
+          updatedAt: new Date(),
+          ...args.create
+        };
+        mockDb.loanDrafts.push(newDraft);
+        return newDraft;
+      }
+    },
+    delete: async (args: { where: { userId: string } }) => {
+      const idx = mockDb.loanDrafts.findIndex(d => d.userId === args.where.userId);
+      if (idx !== -1) {
+        return mockDb.loanDrafts.splice(idx, 1)[0];
+      }
+      return null;
+    }
   }
 };

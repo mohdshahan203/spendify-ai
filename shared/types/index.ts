@@ -190,3 +190,102 @@ export interface LoanScenarioSuggestion {
   rationale: string;
   recommendation: string;
 }
+
+// --- NEW FINTECH MICRO-FEATURE TYPES ---
+
+export type TransactionType = 'INCOME' | 'EXPENSE';
+export type PaymentMethod = 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'CARD' | 'NET_BANKING';
+
+export interface UserTransaction {
+  id: string;
+  userId: string;
+  type: TransactionType;
+  amount: number;
+  category: string;
+  subCategory?: string;
+  description: string;
+  paymentMethod: PaymentMethod;
+  date: string;
+  isRecurring?: boolean;
+  isVerified?: boolean;
+  createdAt: string;
+}
+
+export interface Budget {
+  id: string;
+  userId: string;
+  month: string; // "YYYY-MM"
+  category: string;
+  limitAmount: number;
+  spentAmount?: number;
+  createdAt: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  userId: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedLoanScenario {
+  id: string;
+  userId: string;
+  name: string;
+  amount: number;
+  annualRate: number;
+  tenureMonths: number;
+  emi: number;
+  totalInterest: number;
+  totalPayable: number;
+  createdAt: string;
+}
+
+export interface PrepaymentSimulationInput {
+  amount: number;
+  annualRate: number;
+  tenureMonths: number;
+  extraMonthlyPayment?: number;
+  oneTimePrepayment?: number;
+  prepaymentMonth?: number;
+}
+
+export interface PrepaymentSimulationResult {
+  originalEmi: number;
+  originalTotalInterest: number;
+  originalTenureMonths: number;
+  newTenureMonths: number;
+  tenureMonthsSaved: number;
+  newTotalInterest: number;
+  interestSaved: number;
+  newTotalPayable: number;
+  estimatedPayoffDate: string;
+  originalPayoffDate: string;
+}
+
+export interface ScenarioComparisonResult {
+  scenarioA: LoanCalculationResult & { title: string };
+  scenarioB: LoanCalculationResult & { title: string };
+  emiDifference: number;
+  interestDifference: number;
+  totalPayableDifference: number;
+  summary: string;
+}
+
+export interface LoanDraft {
+  id: string;
+  userId: string;
+  amount: number;
+  tenureMonths: number;
+  purpose: string;
+  monthlyIncome?: number;
+  employmentType?: string;
+  notes?: string;
+  updatedAt: string;
+}

@@ -344,6 +344,11 @@ export class MockDatabase {
   chats: any[] = [];
   repayments: any[] = [];
   auditLogs: any[] = [];
+  userTransactions: any[] = [];
+  budgets: any[] = [];
+  savingsGoals: any[] = [];
+  savedScenarios: any[] = [];
+  loanDrafts: any[] = [];
 
   constructor() {
     console.log('SpendiFy Mock Database initialized with sample borrower profiles.');
@@ -465,6 +470,189 @@ export class MockDatabase {
         age: -0.05
       },
       recommendationNote: 'AI Profile evaluated: Disciplined Saver & Low Credit Default Risk',
+      createdAt: new Date()
+    });
+
+    // Seed realistic transactions for demo borrower
+    const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-10"
+    const today = new Date();
+
+    this.userTransactions.push(
+      {
+        id: 'tx-1',
+        userId: demoBorrowerId,
+        type: 'INCOME',
+        amount: 60000,
+        category: 'Salary & Earnings',
+        subCategory: 'Primary Employment',
+        description: 'Monthly Salary Credit (FinTech Corp)',
+        paymentMethod: 'BANK_TRANSFER',
+        date: new Date(today.getFullYear(), today.getMonth(), 1).toISOString(),
+        isRecurring: true,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-2',
+        userId: demoBorrowerId,
+        type: 'INCOME',
+        amount: 8500,
+        category: 'Freelance & Consulting',
+        subCategory: 'Advisory',
+        description: 'Technical Advisory Retainer',
+        paymentMethod: 'UPI',
+        date: new Date(today.getFullYear(), today.getMonth(), 10).toISOString(),
+        isRecurring: false,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-3',
+        userId: demoBorrowerId,
+        type: 'EXPENSE',
+        amount: 16000,
+        category: 'Housing & Rent',
+        subCategory: 'Apartment',
+        description: 'Monthly Apartment Rent',
+        paymentMethod: 'NET_BANKING',
+        date: new Date(today.getFullYear(), today.getMonth(), 3).toISOString(),
+        isRecurring: true,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-4',
+        userId: demoBorrowerId,
+        type: 'EXPENSE',
+        amount: 7200,
+        category: 'Groceries & Household',
+        subCategory: 'Provisions',
+        description: 'Supermarket Groceries & Household Essentials',
+        paymentMethod: 'UPI',
+        date: new Date(today.getFullYear(), today.getMonth(), 5).toISOString(),
+        isRecurring: false,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-5',
+        userId: demoBorrowerId,
+        type: 'EXPENSE',
+        amount: 2800,
+        category: 'Utilities & Bills',
+        subCategory: 'Electricity & Internet',
+        description: 'Power Utility & High-speed Fiber Broadband',
+        paymentMethod: 'UPI',
+        date: new Date(today.getFullYear(), today.getMonth(), 7).toISOString(),
+        isRecurring: true,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-6',
+        userId: demoBorrowerId,
+        type: 'EXPENSE',
+        amount: 3400,
+        category: 'Dining & Leisure',
+        subCategory: 'Restaurants',
+        description: 'Weekend Dining & Food Delivery',
+        paymentMethod: 'CARD',
+        date: new Date(today.getFullYear(), today.getMonth(), 12).toISOString(),
+        isRecurring: false,
+        isVerified: true,
+        createdAt: new Date()
+      },
+      {
+        id: 'tx-7',
+        userId: demoBorrowerId,
+        type: 'EXPENSE',
+        amount: 1900,
+        category: 'Transit & Commute',
+        subCategory: 'Metro Card',
+        description: 'Metro Transit Smartcard Recharge',
+        paymentMethod: 'UPI',
+        date: new Date(today.getFullYear(), today.getMonth(), 14).toISOString(),
+        isRecurring: true,
+        isVerified: true,
+        createdAt: new Date()
+      }
+    );
+
+    // Seed monthly budgets for demo borrower
+    this.budgets.push(
+      {
+        id: 'bgt-1',
+        userId: demoBorrowerId,
+        month: currentMonth,
+        category: 'Housing & Rent',
+        limitAmount: 18000,
+        createdAt: new Date()
+      },
+      {
+        id: 'bgt-2',
+        userId: demoBorrowerId,
+        month: currentMonth,
+        category: 'Groceries & Household',
+        limitAmount: 10000,
+        createdAt: new Date()
+      },
+      {
+        id: 'bgt-3',
+        userId: demoBorrowerId,
+        month: currentMonth,
+        category: 'Dining & Leisure',
+        limitAmount: 4000,
+        createdAt: new Date()
+      },
+      {
+        id: 'bgt-4',
+        userId: demoBorrowerId,
+        month: currentMonth,
+        category: 'Utilities & Bills',
+        limitAmount: 3500,
+        createdAt: new Date()
+      }
+    );
+
+    // Seed savings goals for demo borrower
+    this.savingsGoals.push(
+      {
+        id: 'goal-1',
+        userId: demoBorrowerId,
+        title: 'Emergency Reserve Fund (6 Months)',
+        targetAmount: 100000,
+        currentAmount: 65000,
+        targetDate: new Date(today.getFullYear() + 1, today.getMonth(), 1).toISOString(),
+        priority: 'HIGH',
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'goal-2',
+        userId: demoBorrowerId,
+        title: 'Professional Laptop Upgrade',
+        targetAmount: 50000,
+        currentAmount: 24000,
+        targetDate: new Date(today.getFullYear(), today.getMonth() + 6, 1).toISOString(),
+        priority: 'MEDIUM',
+        isArchived: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    );
+
+    // Seed a saved loan calculation scenario
+    this.savedScenarios.push({
+      id: 'scen-1',
+      userId: demoBorrowerId,
+      name: 'Rooftop Solar Installation',
+      amount: 60000,
+      annualRate: 12.5,
+      tenureMonths: 12,
+      emi: 5345,
+      totalInterest: 4140,
+      totalPayable: 65040,
       createdAt: new Date()
     });
 

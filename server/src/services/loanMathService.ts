@@ -403,3 +403,121 @@ export function evaluateFinancialWarnings(
 
   return alerts;
 }
+
+/**
+ * Simulates loan prepayment impacts (extra monthly EMI or one-time lump sum).
+ */
+export function simulatePrepayment(input: {
+  amount?: number;
+  principal?: number;
+  annualRate: number;
+  tenureMonths: number;
+  extraMonthlyPayment?: number;
+  oneTimePrepayment?: number;
+  lumpSumPrepayment?: number;
+  prepaymentMonth?: number;
+  lumpSumMonth?: number;
+}) {
+  const amount = input.amount ?? input.principal ?? 0;
+  const annualRate = input.annualRate;
+  const tenureMonths = input.tenureMonths;
+  const extraMonthlyPayment = input.extraMonthlyPayment ?? 0;
+  const oneTimePrepayment = input.oneTimePrepayment ?? input.lumpSumPrepayment ?? 0;
+  const prepaymentMonth = input.prepaymentMonth ?? input.lumpSumMonth ?? 1;
+
+  const validPrincipal = Math.max(0, Number(amount) || 0);
+  const validRate = Math.max(0, Number(annualRate) || 0);
+  const validTenure = Math.max(1, Math.round(Number(tenureMonths) || 1));
+  const monthlyRate = validRate / 12 / 100;
+
+  const originalSchedule = generateAmortisationSchedule({ amount: validPrincipal, annualRate: validRate, tenureMonths: validTenure });
+  const standardEmi = originalSchedule.emi;
+
+  let currentBalance = validPrincipal;
+  let newTotalInterest = 0;
+  let simulatedMonths = 0;
+
+  const now = new Date();
+  const originalPayoff = new Date(now);
+  originalPayoff.setMonth(originalPayoff.getMonth() + validTenure);
+
+  while (currentBalance > 0.01 && simulatedMonths < validTenure * 2) {
+    simulatedMonths++;
+    const interest = validRate > 0 ? Math.round(currentBalance * monthlyRate * 100) / 100 : 0;
+    newTotalInterest = Math.round((newTotalInterest + interest) * 100) / 100;
+
+    let payment = standardEmi + (extraMonthlyPayment || 0);
+    if (oneTimePrepayment && simulatedMonths === prepaymentMonth) {
+      payment += oneTimePrepayment;
+    }
+
+    const principalPaid = Math.min(currentBalance, Math.max(0, payment - interest));
+    currentBalance = Math.round((currentBalance - principalPaid) * 100) / 100;
+
+    if (currentBalance <= 0) break;
+  }
+
+  const interestSaved = Math.max(0, Math.round((originalSchedule.totalInterest - newTotalInterest) * 100) / 100);
+  const tenureMonthsSaved = Math.max(0, validTenure - simulatedMonths);
+  const newPayoff = new Date(now);
+  newPayoff.setMonth(newPayoff.getMonth() + simulatedMonths);
+
+  return {
+    originalEmi: standardEmi,
+    originalTotalInterest: originalSchedule.totalInterest,
+    originalTenureMonths: validTenure,
+    newTenureMonths: simulatedMonths,
+    tenureMonthsSaved,
+    newTotalInterest,
+    interestSaved,
+    newTotalPayable: Math.round((validPrincipal + newTotalInterest) * 100) / 100,
+    estimatedPayoffDate: newPayoff.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
+    originalPayoffDate: originalPayoff.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+  };
+}
+
+/**
+ * Side-by-side comparison of two loan options.
+ */
+export function compareLoanScenarios(
+  planA: any,
+  planB: any
+) {
+  const normA: LoanCalculationInput = {
+    amount: planA.amount ?? planA.principal ?? 0,
+    annualRate: Number(planA.annualRate) || 0,
+    tenureMonths: Number(planA.tenureMonths) || 12
+  };
+  const normB: LoanCalculationInput = {
+    amount: planB.amount ?? planB.principal ?? 0,
+    annualRate: Number(planB.annualRate) || 0,
+    tenureMonths: Number(planB.tenureMonths) || 12
+  };
+
+  const resultA = generateAmortisationSchedule(normA);
+  const resultB = generateAmortisationSchedule(normB);
+
+  const emiDiff = Math.round((resultA.emi - resultB.emi) * 100) / 100;
+  const interestDiff = Math.round((resultA.totalInterest - resultB.totalInterest) * 100) / 100;
+  const totalPayableDiff = Math.round((resultA.totalPayable - resultB.totalPayable) * 100) / 100;
+
+  let summary = '';
+  if (emiDiff > 0 && interestDiff < 0) {
+    summary = `${planA.title || 'Plan A'} has a higher EMI by ₹${Math.abs(emiDiff)}/mo, but saves ₹${Math.abs(interestDiff)} in total interest compared to ${planB.title || 'Plan B'}.`;
+  } else if (emiDiff < 0 && interestDiff > 0) {
+    summary = `${planA.title || 'Plan A'} reduces your monthly EMI by ₹${Math.abs(emiDiff)}, but adds ₹${Math.abs(interestDiff)} in cumulative interest compared to ${planB.title || 'Plan B'}.`;
+  } else if (interestDiff === 0) {
+    summary = `Both plans accrue the same total interest (₹${resultA.totalInterest}).`;
+  } else {
+    summary = `${planA.title || 'Plan A'} difference: EMI ₹${emiDiff > 0 ? '+' : ''}${emiDiff}, Total Interest ₹${interestDiff > 0 ? '+' : ''}${interestDiff}.`;
+  }
+
+  return {
+    scenarioA: { ...resultA, title: planA.title || 'Scenario A' },
+    scenarioB: { ...resultB, title: planB.title || 'Scenario B' },
+    emiDifference: emiDiff,
+    interestDifference: interestDiff,
+    totalPayableDifference: totalPayableDiff,
+    summary
+  };
+}

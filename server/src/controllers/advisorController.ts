@@ -1,18 +1,56 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { dbService } from '../services/dbService';
 import { geminiService, UserFinancialContext } from '../services/geminiService';
 import { SAMPLE_PROFILES_DATA } from '../config/db';
 
 export const getAdvisorStatus = async (req: AuthenticatedRequest, res: Response) => {
+  const status = geminiService.getStatus();
   res.status(200).json({
-    configured: geminiService.isConfigured(),
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    configured: status.configured,
+    keyPresent: status.keyPresent,
+    model: status.model,
     provider: 'Google GenAI SDK (@google/genai)',
-    instructions: geminiService.isConfigured()
+    instructions: status.configured
       ? 'Gemini AI Assistant is fully configured and ready for live financial advisory.'
       : 'Set GEMINI_API_KEY in server/.env to enable live Gemini AI financial advisory responses.'
   });
+};
+
+/**
+ * Safe, public diagnostic check for backend configuration without exposing secrets
+ */
+export const checkAdvisorConfig = async (_req: Request, res: Response) => {
+  const status = geminiService.getStatus();
+  res.status(200).json({
+    status: 'OK',
+    gemini: {
+      sdk: status.sdk,
+      model: status.model,
+      configured: status.configured,
+      keyPresent: status.keyPresent,
+      formatValid: status.formatValid
+    },
+    message: status.configured
+      ? 'Gemini API is securely configured in backend environment.'
+      : 'Gemini API key is not configured or is a placeholder in server/.env.'
+  });
+};
+
+/**
+ * Authenticated test endpoint to trigger a real non-mock smoke test against Gemini
+ */
+export const testAdvisorLive = async (req: AuthenticatedRequest, res: Response) => {
+  const result = await geminiService.testConnection();
+  if (!result.success) {
+    return res.status(result.error?.includes('not configured') ? 400 : 502).json({
+      success: false,
+      error: result.error,
+      model: result.model,
+      latencyMs: result.latencyMs
+    });
+  }
+  res.status(200).json(result);
 };
 
 export const getChatHistory = async (req: AuthenticatedRequest, res: Response) => {
@@ -65,17 +103,30 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     const latestLoan = userLoans.length > 0 ? userLoans[userLoans.length - 1] : null;
     const latestPrediction = latestLoan?.prediction;
 
-    // Deterministic arithmetic for income, expenses, and surplus
-    const monthlyIncome = matchedProfile?.spendingHabits?.monthlyIncome || 50000;
-    const monthlyExpenses = matchedProfile?.spendingHabits?.monthlyExpenses || 25000;
+    // Retrieve live telemetry and credit assessment
+    const { extractBorrowerFeatures, calculateCreditScoreForUser } = await import('../services/creditScoreService');
+    const { telemetryStats } = await extractBorrowerFeatures(userId);
+
+    let creditScore: number | undefined = latestPrediction?.creditScore;
+    let riskCategory = latestPrediction?.riskCategory || 'MEDIUM';
+    let defaultProbability = latestPrediction?.defaultProbability ?? 0.15;
+    let financialHealthScore = latestPrediction?.financialHealth || 75.0;
+
+    try {
+      const assessment = await calculateCreditScoreForUser(userId);
+      creditScore = assessment.creditScore;
+      riskCategory = assessment.riskCategory;
+      defaultProbability = assessment.defaultProbability;
+      financialHealthScore = assessment.financialHealth;
+    } catch {
+      // Keep prediction from latest loan if live assessment is offline
+    }
+
+    const monthlyIncome = telemetryStats.verifiedIncome;
+    const monthlyExpenses = telemetryStats.monthlyExpenses;
     const existingDebtEmis = activeLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
     const monthlySurplus = monthlyIncome - monthlyExpenses - existingDebtEmis;
-    const savings = matchedProfile ? Math.round(monthlyIncome * 0.35) : 35000;
-
-    const creditScore = latestPrediction?.creditScore || matchedProfile?.creditScore || 740;
-    const riskCategory = latestPrediction?.riskCategory || matchedProfile?.riskCategory || 'LOW';
-    const defaultProbability = latestPrediction?.defaultProbability ?? matchedProfile?.defaultProbability ?? 0.08;
-    const financialHealthScore = latestPrediction?.financialHealth || matchedProfile?.financialHealth || 82.0;
+    const savings = Math.max(0, Math.round(monthlyIncome * 0.35));
 
     const context: UserFinancialContext = {
       userName: userRecord?.name || req.user?.email.split('@')[0] || 'Borrower',

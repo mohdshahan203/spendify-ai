@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -35,17 +36,74 @@ export const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
+        <ToastProvider>
+          <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           
-          {/* Protected Borrower Dashboard */}
+          {/* Protected Borrower Dashboard & Dedicated Section Routes */}
           <Route 
             path="/dashboard" 
             element={
               <ProtectedRoute allowedRoles={['BORROWER']}>
-                <BorrowerDashboard />
+                <BorrowerDashboard initialTab="home" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/credit-score" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="home" initialModal="credit-score" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/loans" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="loan" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/calculator" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="calculator" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/repayments" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="repayments" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/ai-assistant" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="ai" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/transactions" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="transactions" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/budgets" 
+            element={
+              <ProtectedRoute allowedRoles={['BORROWER']}>
+                <BorrowerDashboard initialTab="budgets" />
               </ProtectedRoute>
             } 
           />
@@ -82,6 +140,7 @@ export const App: React.FC = () => {
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ToastProvider>
       </AuthProvider>
     </Router>
   );

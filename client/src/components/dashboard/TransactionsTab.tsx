@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 import { UserTransaction } from '@shared/types';
 import {
   Search,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export const TransactionsTab: React.FC = () => {
+  const { toast } = { toast: useToast() };
   const [transactions, setTransactions] = useState<UserTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
@@ -121,8 +123,9 @@ export const TransactionsTab: React.FC = () => {
       setModalOpen(false);
       resetForm();
       fetchTransactions();
+      toast.success(editingTx ? 'Transaction updated successfully.' : 'Transaction recorded successfully.', 'Transaction Saved');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save transaction');
+      toast.error(err.response?.data?.error || 'Failed to save transaction', 'Save Error');
     } finally {
       setSavingTx(false);
     }
@@ -132,9 +135,10 @@ export const TransactionsTab: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this transaction record?')) return;
     try {
       await api.delete(`/transactions/${id}`);
+      toast.success('Transaction record deleted successfully.', 'Deleted');
       fetchTransactions();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete transaction');
+      toast.error(err.response?.data?.error || 'Failed to delete transaction', 'Delete Error');
     }
   };
 
@@ -184,7 +188,7 @@ export const TransactionsTab: React.FC = () => {
       const text = event.target?.result as string;
       const lines = text.split('\n').filter(l => l.trim().length > 0);
       if (lines.length < 2) {
-        alert('CSV file must contain a header row and at least one data row.');
+        toast.warning('CSV file must contain a header row and at least one data row.', 'Invalid CSV Format');
         return;
       }
 
@@ -215,9 +219,10 @@ export const TransactionsTab: React.FC = () => {
     try {
       const res = await api.post('/transactions/import-csv', { csvRows: csvPreviewRows });
       setCsvImportResult(res.data);
+      toast.success(`Successfully imported ${res.data.count || res.data.imported || 'multiple'} transactions.`, 'CSV Imported');
       fetchTransactions();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to import CSV');
+      toast.error(err.response?.data?.error || 'Failed to import CSV transactions', 'Import Error');
     } finally {
       setImportingCsv(false);
     }

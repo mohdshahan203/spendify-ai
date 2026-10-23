@@ -256,10 +256,10 @@ export const getBorrowerProfiles = async (req: Request, res: Response) => {
           interestRate: latestLoan.interestRate,
           outstandingBalance: latestLoan.outstandingBalance || latestLoan.amount
         } : null,
-        creditScore: latestLoan?.prediction?.creditScore || 720,
-        financialHealth: latestLoan?.prediction?.financialHealth || 80,
-        riskCategory: latestLoan?.prediction?.riskCategory || 'LOW',
-        defaultProbability: latestLoan?.prediction?.defaultProbability || 0.1,
+        creditScore: latestLoan?.prediction?.creditScore ?? null,
+        financialHealth: latestLoan?.prediction?.financialHealth ?? null,
+        riskCategory: latestLoan?.prediction?.riskCategory || 'PENDING_ASSESSMENT',
+        defaultProbability: latestLoan?.prediction?.defaultProbability ?? null,
         spendingHabits: spendingHabits || {
           categories: [
             { name: 'Household Essentials', percentage: 40, color: '#1976D2' },

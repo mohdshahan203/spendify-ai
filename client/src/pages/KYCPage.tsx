@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { KYCDocument } from '@shared/types';
 import LandingCanvas from '../components/canvas/LandingCanvas';
 
 export const KYCPage: React.FC = () => {
   const { logout } = useAuth();
+  const { toast } = { toast: useToast() };
   
   const [kyc, setKyc] = useState<KYCDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,9 +73,11 @@ export const KYCPage: React.FC = () => {
         headers: { 'Content-Type': undefined }
       });
       setKyc(response.data.kyc);
-      alert('Verification files uploaded successfully for review!');
+      toast.success('Your KYC documents have been securely uploaded for compliance review!', 'Verification Submitted');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to submit KYC. Make sure files are under 10MB PDFs/Images.');
+      const msg = err.response?.data?.error || 'Failed to submit KYC. Make sure files are under 10MB PDFs/Images.';
+      setError(msg);
+      toast.error(msg, 'Upload Failed');
     } finally {
       setSubmitting(false);
     }

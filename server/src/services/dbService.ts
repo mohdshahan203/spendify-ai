@@ -282,6 +282,31 @@ export const dbService = {
       };
       mockDb.predictions.push(newPrediction);
       return newPrediction;
+    },
+    update: async (args: { where: { loanId: string }; data: any }) => {
+      if (!useMock) {
+        try {
+          const dataCopy = { ...args.data };
+          if (dataCopy.shapExplanation && typeof dataCopy.shapExplanation !== 'string') {
+            dataCopy.shapExplanation = JSON.stringify(dataCopy.shapExplanation);
+          }
+          const pred = await prisma.aIPrediction.update({ ...args, data: dataCopy });
+          if (pred && typeof pred.shapExplanation === 'string') {
+            try {
+              pred.shapExplanation = JSON.parse(pred.shapExplanation) as any;
+            } catch {}
+          }
+          return pred;
+        } catch {
+          useMock = true;
+        }
+      }
+      const idx = mockDb.predictions.findIndex(p => p.loanId === args.where.loanId);
+      if (idx !== -1) {
+        mockDb.predictions[idx] = { ...mockDb.predictions[idx], ...args.data };
+        return mockDb.predictions[idx];
+      }
+      return null;
     }
   },
 

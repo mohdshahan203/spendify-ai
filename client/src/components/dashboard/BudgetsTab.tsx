@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 import {
   Target,
   PiggyBank,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 
 export const BudgetsTab: React.FC = () => {
+  const { toast } = { toast: useToast() };
   const [budgetData, setBudgetData] = useState<any>(null);
   const [goalsData, setGoalsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -72,9 +74,10 @@ export const BudgetsTab: React.FC = () => {
       });
       setBudgetModalOpen(false);
       setBudgetLimit('');
+      toast.success(`Monthly limit for ${budgetCategory} saved.`, 'Budget Saved');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save budget');
+      toast.error(err.response?.data?.error || 'Failed to save budget', 'Budget Error');
     } finally {
       setSavingBudget(false);
     }
@@ -84,9 +87,10 @@ export const BudgetsTab: React.FC = () => {
     if (!window.confirm('Delete this category budget limit?')) return;
     try {
       await api.delete(`/budgets/${id}`);
+      toast.success('Budget limit removed.', 'Budget Deleted');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete budget');
+      toast.error(err.response?.data?.error || 'Failed to delete budget', 'Delete Error');
     }
   };
 
@@ -107,9 +111,10 @@ export const BudgetsTab: React.FC = () => {
       setGoalTitle('');
       setGoalTarget('');
       setGoalDate('');
+      toast.success(`Savings goal "${goalTitle}" created!`, 'Goal Created');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to save goal');
+      toast.error(err.response?.data?.error || 'Failed to save goal', 'Goal Error');
     } finally {
       setSavingGoal(false);
     }
@@ -128,10 +133,11 @@ export const BudgetsTab: React.FC = () => {
       });
       setContributeModalOpen(false);
       setContributeAmount('');
+      toast.success(`Added ₹${Number(contributeAmount).toLocaleString('en-IN')} towards "${selectedGoal.title}"!`, 'Contribution Recorded');
       setSelectedGoal(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to record contribution');
+      toast.error(err.response?.data?.error || 'Failed to record contribution', 'Contribution Error');
     } finally {
       setProcessingContribution(false);
     }
@@ -141,9 +147,10 @@ export const BudgetsTab: React.FC = () => {
     if (!window.confirm('Archive this savings goal?')) return;
     try {
       await api.delete(`/savings-goals/${id}`);
+      toast.success('Savings goal archived.', 'Goal Removed');
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to archive goal');
+      toast.error(err.response?.data?.error || 'Failed to archive goal', 'Error');
     }
   };
 

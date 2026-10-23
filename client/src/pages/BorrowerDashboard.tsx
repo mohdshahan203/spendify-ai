@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   Loan,
   Alert as AlertType,
@@ -13,11 +14,18 @@ import {
   PrepaymentSimulationResult,
   ScenarioComparisonResult,
   SavedLoanScenario,
-  LoanDraft
+  LoanDraft,
+  CreditAssessmentResult,
+  DataDrivenRecommendation,
+  FinancialInsightsResult
 } from '@shared/types';
 import { NotificationDrawer } from '../components/dashboard/NotificationDrawer';
 import { TransactionsTab } from '../components/dashboard/TransactionsTab';
 import { BudgetsTab } from '../components/dashboard/BudgetsTab';
+import { CreditScoreCenterpiece } from '../components/dashboard/CreditScoreCenterpiece';
+import { CreditScoreBreakdownModal } from '../components/dashboard/CreditScoreBreakdownModal';
+import { DataDrivenRecommendationsCard } from '../components/dashboard/DataDrivenRecommendationsCard';
+import { LiveFinancialInsights } from '../components/dashboard/LiveFinancialInsights';
 import {
   Home as HomeIcon,
   Calculator,
@@ -53,14 +61,33 @@ import {
   FileText
 } from 'lucide-react';
 
-export const BorrowerDashboard: React.FC = () => {
+export type BorrowerTab =
+  | 'home'
+  | 'calculator'
+  | 'suggestions'
+  | 'repayments'
+  | 'loan'
+  | 'ai'
+  | 'history'
+  | 'profile'
+  | 'transactions'
+  | 'budgets';
+
+interface BorrowerDashboardProps {
+  initialTab?: BorrowerTab;
+  initialModal?: 'credit-score' | null;
+}
+
+export const BorrowerDashboard: React.FC<BorrowerDashboardProps> = ({
+  initialTab = 'home',
+  initialModal = null
+}) => {
   const { user, logout } = useAuth();
+  const { toast } = { toast: useToast() };
   const navigate = useNavigate();
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<
-    'home' | 'calculator' | 'suggestions' | 'repayments' | 'loan' | 'ai' | 'history' | 'profile' | 'transactions' | 'budgets'
-  >('home');
+  const [activeTab, setActiveTab] = useState<BorrowerTab>(initialTab);
 
   // Core Data States
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -69,6 +96,24 @@ export const BorrowerDashboard: React.FC = () => {
   const [kyc, setKyc] = useState<KYCDocument | null>(null);
   const [geminiStatus, setGeminiStatus] = useState<{ configured: boolean; model: string } | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // --- REAL CREDIT SCORING & RECOMMENDATION ENGINE STATE ---
+  const [creditAssessment, setCreditAssessment] = useState<CreditAssessmentResult | null>(null);
+  const [isRecalculatingScore, setIsRecalculatingScore] = useState(false);
+  const [creditScoreModalOpen, setCreditScoreModalOpen] = useState(initialModal === 'credit-score');
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+    if (initialModal === 'credit-score') setCreditScoreModalOpen(true);
+  }, [initialTab, initialModal]);
+  const [financialInsights, setFinancialInsights] = useState<FinancialInsightsResult | null>(null);
+  const [recommendations, setRecommendations] = useState<DataDrivenRecommendation[]>([]);
+  const [creditScoreError, setCreditScoreError] = useState<string | null>(null);
+
+  // Calculator cashflow inputs
+  const [calcIncome, setCalcIncome] = useState<string>('');
+  const [calcExpenses, setCalcExpenses] = useState<string>('');
+  const [calcDebt, setCalcDebt] = useState<string>('');
 
   // --- PHASE 4: LOAN CALCULATOR STATE ---
   const [calcAmount, setCalcAmount] = useState<number>(50000);
@@ -168,13 +213,16 @@ export const BorrowerDashboard: React.FC = () => {
   // Fetch all initial data
   const fetchDashboardData = async () => {
     try {
-      const [kycRes, loansRes, alertsRes, chatRes, repaymentsRes, geminiRes] = await Promise.all([
+      const [kycRes, loansRes, alertsRes, chatRes, repaymentsRes, geminiRes, creditRes, insightsRes, recRes] = await Promise.all([
         api.get('/kyc').catch(() => ({ data: null })),
         api.get('/loans/history').catch(() => ({ data: [] })),
         api.get('/alerts').catch(() => ({ data: [] })),
         api.get('/advisor/history').catch(() => ({ data: [] })),
         api.get('/loans/repayments').catch(() => ({ data: [] })),
-        api.get('/advisor/status').catch(() => ({ data: { configured: false, model: 'gemini-2.5-flash' } }))
+        api.get('/advisor/status').catch(() => ({ data: { configured: false, model: 'gemini-3.8-flash' } })),
+        api.get('/credit-score').catch((err) => ({ data: null, error: err.response?.data?.error || err.message })),
+        api.get('/financial-insights').catch(() => ({ data: null })),
+        api.get('/loans/recommendations').catch(() => ({ data: { recommendations: [] } }))
       ]);
 
       setKyc(kycRes.data);
@@ -184,6 +232,28 @@ export const BorrowerDashboard: React.FC = () => {
       setRepaymentLoans(repaymentsRes.data);
       setGeminiStatus(geminiRes.data);
 
+      if (creditRes.data) {
+        setCreditAssessment(creditRes.data);
+      } else if ((creditRes as any).error) {
+        setCreditScoreError((creditRes as any).error);
+      }
+
+      if (insightsRes.data) {
+        setFinancialInsights(insightsRes.data);
+        if (insightsRes.data.creditAssessment && !creditRes.data) {
+          setCreditAssessment(insightsRes.data.creditAssessment);
+        }
+        if (insightsRes.data.metrics) {
+          setCalcIncome(String(insightsRes.data.metrics.monthlyIncome || ''));
+          setCalcExpenses(String(insightsRes.data.metrics.monthlyExpenses || ''));
+          setCalcDebt(String(insightsRes.data.metrics.existingDebtEmis || '0'));
+        }
+      }
+
+      if (recRes.data?.recommendations) {
+        setRecommendations(recRes.data.recommendations);
+      }
+
       if (repaymentsRes.data.length > 0) {
         setSelectedRepaymentLoan(repaymentsRes.data[0]);
       }
@@ -191,6 +261,29 @@ export const BorrowerDashboard: React.FC = () => {
       console.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRecalculateCreditScore = async () => {
+    setIsRecalculatingScore(true);
+    setCreditScoreError(null);
+    try {
+      const res = await api.post('/credit-score/recalculate');
+      setCreditAssessment(res.data.assessment);
+      toast.success(`Credit score recalculated via ML pipeline: ${res.data.assessment.creditScore} / 900`);
+      const [insightsRes, recRes] = await Promise.all([
+        api.get('/financial-insights').catch(() => null),
+        api.get('/loans/recommendations').catch(() => null)
+      ]);
+      if (insightsRes?.data) setFinancialInsights(insightsRes.data);
+      if (recRes?.data?.recommendations) setRecommendations(recRes.data.recommendations);
+    } catch (err: any) {
+      console.error('Recalculate score error:', err);
+      const msg = err.response?.data?.error || 'Failed to recalculate credit score. ML service may be offline.';
+      setCreditScoreError(msg);
+      toast.error(msg);
+    } finally {
+      setIsRecalculatingScore(false);
     }
   };
 
@@ -365,9 +458,10 @@ export const BorrowerDashboard: React.FC = () => {
       setPaymentReceipt(res.data.receipt);
       setPaymentModalOpen(false);
       setPaymentSuccessModal(true);
+      toast.success(`Payment of ₹${Number(emiToPay).toLocaleString('en-IN')} confirmed!`, 'Instalment Paid');
       fetchDashboardData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Payment failed to process');
+      toast.error(err.response?.data?.error || 'Payment failed to process', 'Payment Error');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -576,7 +670,7 @@ export const BorrowerDashboard: React.FC = () => {
               KYC: {kyc?.status || 'NOT_STARTED'}
             </span>
             <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-              Score: {latestLoan?.prediction?.creditScore || 785}
+              Score: {creditAssessment?.creditScore || latestLoan?.prediction?.creditScore || 'Assessing...'}
             </span>
           </div>
         </div>
@@ -639,12 +733,16 @@ export const BorrowerDashboard: React.FC = () => {
               <div className="flex items-center gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                 <div>
                   <span className="text-[11px] text-slate-400 font-medium block">Monthly Surplus</span>
-                  <span className="text-2xl font-black text-emerald-400">₹33,250</span>
+                  <span className="text-2xl font-black text-emerald-400">
+                    ₹{(financialInsights?.metrics?.disposableIncome ?? 0).toLocaleString('en-IN')}
+                  </span>
                 </div>
                 <div className="h-8 w-px bg-slate-800"></div>
                 <div>
                   <span className="text-[11px] text-slate-400 font-medium block">Debt / Income</span>
-                  <span className="text-2xl font-black text-cyan-400">12%</span>
+                  <span className="text-2xl font-black text-cyan-400">
+                    {financialInsights?.metrics?.debtToIncomeRatio ?? 0}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -669,6 +767,31 @@ export const BorrowerDashboard: React.FC = () => {
                 </Link>
               </div>
             )}
+
+            {/* ─── PROMINENT CREDIT SCORE CENTERPIECE ─── */}
+            <CreditScoreCenterpiece
+              assessment={creditAssessment}
+              loading={loading}
+              isRecalculating={isRecalculatingScore}
+              onRecalculate={handleRecalculateCreditScore}
+              onOpenBreakdown={() => setCreditScoreModalOpen(true)}
+              error={creditScoreError}
+            />
+
+            {/* ─── LIVE FINANCIAL INSIGHTS TELEMETRY ─── */}
+            <LiveFinancialInsights
+              insights={financialInsights}
+              loading={loading}
+              onNavigateTab={setActiveTab}
+            />
+
+            {/* ─── REAL DATA-DRIVEN RECOMMENDATIONS ─── */}
+            <DataDrivenRecommendationsCard
+              recommendations={recommendations}
+              loading={loading}
+              onNavigateTab={setActiveTab}
+              onRefresh={fetchDashboardData}
+            />
 
             {/* Financial Warnings & Notification Center */}
             <div className="flex flex-col gap-3">
@@ -952,6 +1075,46 @@ export const BorrowerDashboard: React.FC = () => {
                   />
                 </div>
 
+                {/* Cashflow Telemetry Inputs for Affordability */}
+                <div className="flex flex-col gap-3 pt-3 border-t border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    My Financial Baseline
+                  </span>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-slate-300">Monthly Net Income (₹)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 55000"
+                      value={calcIncome}
+                      onChange={e => setCalcIncome(e.target.value)}
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-slate-300">Living Expenses (₹)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 25000"
+                      value={calcExpenses}
+                      onChange={e => setCalcExpenses(e.target.value)}
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-slate-300">Existing Monthly Debt EMIs (₹)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 0"
+                      value={calcDebt}
+                      onChange={e => setCalcDebt(e.target.value)}
+                      className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1025,6 +1188,84 @@ export const BorrowerDashboard: React.FC = () => {
                         ></div>
                       </div>
                     </div>
+
+                    {/* Live Dynamic Affordability Indicator */}
+                    {(() => {
+                      const userInc = Number(calcIncome) || financialInsights?.metrics?.monthlyIncome || 50000;
+                      const userExp = Number(calcExpenses) || financialInsights?.metrics?.monthlyExpenses || 25000;
+                      const userDebt = Number(calcDebt) || financialInsights?.metrics?.existingDebtEmis || 0;
+                      const netSurplus = userInc - userExp - userDebt;
+                      const surplusAfter = netSurplus - calcResult.emi;
+                      const projectedDti = userInc > 0 ? Math.round(((userDebt + calcResult.emi) / userInc) * 1000) / 10 : 0;
+                      const isDeficit = surplusAfter < 0;
+                      const isHighDti = projectedDti > 45;
+
+                      const altTenure = Math.min(36, calcTenure + 6);
+                      const altEmi = altTenure > calcTenure
+                        ? Math.round((calcAmount * (calcRate / 12 / 100) * Math.pow(1 + calcRate / 12 / 100, altTenure)) / (Math.pow(1 + calcRate / 12 / 100, altTenure) - 1))
+                        : calcResult.emi;
+                      const emiSaved = Math.round(calcResult.emi - altEmi);
+
+                      return (
+                        <div className="flex flex-col gap-3 pt-4 border-t border-slate-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <Compass size={14} className="text-emerald-400" /> Dynamic Cashflow Affordability
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold uppercase ${
+                              isDeficit ? 'bg-red-500/20 text-red-400 border border-red-500/30' : isHighDti ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            }`}>
+                              {isDeficit ? 'Deficit / High Risk' : isHighDti ? 'Stretched DTI' : 'Comfortable Affordability'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+                            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px] uppercase">Surplus After EMI</span>
+                              <span className={`text-base font-black ${isDeficit ? 'text-red-400' : 'text-emerald-400'}`}>
+                                ₹{surplusAfter.toLocaleString('en-IN')}
+                              </span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px] uppercase">Projected DTI</span>
+                              <span className={`text-base font-black ${isHighDti ? 'text-amber-400' : 'text-cyan-400'}`}>
+                                {projectedDti}%
+                              </span>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 col-span-2 sm:col-span-1">
+                              <span className="text-slate-500 block text-[10px] uppercase">Available Surplus</span>
+                              <span className="text-base font-bold text-white">₹{netSurplus.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+
+                          {/* Dynamic Warning & Alternative */}
+                          {isDeficit ? (
+                            <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-500/30 text-xs text-red-200">
+                              <span className="font-bold block mb-1">⚠️ Cashflow Deficit Warning:</span>
+                              The proposed EMI of ₹{calcResult.emi.toLocaleString('en-IN')} exceeds your available monthly surplus by ₹{Math.abs(surplusAfter).toLocaleString('en-IN')}.
+                              {altTenure > calcTenure && (
+                                <div className="mt-2 text-cyan-300">
+                                  💡 <strong>Safer Alternative:</strong> Extending tenure to {altTenure} months reduces EMI to ₹{altEmi.toLocaleString('en-IN')} (saves ₹{emiSaved.toLocaleString('en-IN')}/mo in monthly commitment).
+                                </div>
+                              )}
+                            </div>
+                          ) : isHighDti ? (
+                            <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30 text-xs text-amber-200">
+                              <span>⚠️ <strong>Elevated Debt Ratio:</strong> Proposed loan brings debt commitments to {projectedDti}% of earnings (recommended maximum: 40%).</span>
+                            </div>
+                          ) : (
+                            <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-xs text-emerald-200">
+                              <span>🛡️ <strong>Optimal Affordability:</strong> This proposed EMI leaves a healthy buffer of ₹{surplusAfter.toLocaleString('en-IN')} in monthly savings.</span>
+                            </div>
+                          )}
+
+                          {/* Advisory Disclaimer */}
+                          <p className="text-[10px] text-slate-500 italic mt-1">
+                            * Transparent Disclaimer: Affordability estimates and EMI amortization schedules are mathematical simulations based on disclosed cashflow and do not constitute a binding loan approval or credit contract.
+                          </p>
+                        </div>
+                      );
+                    })()}
 
                     {/* Amortisation Table View */}
                     {showAmortTable && (
@@ -1361,7 +1602,9 @@ export const BorrowerDashboard: React.FC = () => {
                     onChange={e => setCustomIncome(e.target.value)}
                     className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
                   />
-                  <span className="text-[10px] text-slate-500">Default: ₹55,000 / month</span>
+                  <span className="text-[10px] text-slate-500">
+                    Verified: ₹{(financialInsights?.metrics?.monthlyIncome || 55000).toLocaleString('en-IN')} / month
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -1373,7 +1616,9 @@ export const BorrowerDashboard: React.FC = () => {
                     onChange={e => setCustomExpenses(e.target.value)}
                     className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
                   />
-                  <span className="text-[10px] text-slate-500">Rent, groceries, utilities</span>
+                  <span className="text-[10px] text-slate-500">
+                    Verified: ₹{(financialInsights?.metrics?.monthlyExpenses || 28000).toLocaleString('en-IN')} / month
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -1385,7 +1630,9 @@ export const BorrowerDashboard: React.FC = () => {
                     onChange={e => setCustomDebt(e.target.value)}
                     className="px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
                   />
-                  <span className="text-[10px] text-slate-500">Other active loan commitments</span>
+                  <span className="text-[10px] text-slate-500">
+                    Active Debt EMIs: ₹{(financialInsights?.metrics?.existingDebtEmis || 0).toLocaleString('en-IN')} / month
+                  </span>
                 </div>
               </div>
             </div>
@@ -1496,6 +1743,14 @@ export const BorrowerDashboard: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* ─── REAL DATA-DRIVEN RECOMMENDATIONS ─── */}
+            <DataDrivenRecommendationsCard
+              recommendations={recommendations}
+              loading={loading}
+              onNavigateTab={setActiveTab}
+              onRefresh={fetchDashboardData}
+            />
           </div>
         )}
 
@@ -2320,6 +2575,13 @@ export const BorrowerDashboard: React.FC = () => {
 
         </div>
       </nav>
+
+      {/* ─── CREDIT SCORE BREAKDOWN MODAL ─── */}
+      <CreditScoreBreakdownModal
+        isOpen={creditScoreModalOpen}
+        onClose={() => setCreditScoreModalOpen(false)}
+        assessment={creditAssessment}
+      />
 
       {/* ─── NOTIFICATION CENTRE DRAWER ─── */}
       <NotificationDrawer

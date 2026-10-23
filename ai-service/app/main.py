@@ -142,8 +142,8 @@ def predict(req: PredictRequestNew):
         explanations = explainer.explain(X_scaled[0])
         shapExplanation = {item["feature_name"]: item["shap_value"] for item in explanations}
         
-        # Scaled scores
-        creditScore = int(np.clip(850 - (default_prob * 500), 300, 850))
+        # Scaled scores (standard 300 - 900 range)
+        creditScore = int(np.clip(900 - (default_prob * 600), 300, 900))
         financialHealth = round(float(np.clip(100 - (default_prob * 100), 0, 100)), 1)
         
         isRisky = riskCategory in ["HIGH", "CRITICAL"]

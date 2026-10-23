@@ -8,6 +8,7 @@ import * as alertController from '../controllers/alertController';
 import * as transactionController from '../controllers/transactionController';
 import * as budgetController from '../controllers/budgetController';
 import * as reportController from '../controllers/reportController';
+import * as creditScoreController from '../controllers/creditScoreController';
 import { authenticateJWT, authorizeRoles } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 
@@ -32,6 +33,12 @@ router.post(
   kycController.uploadKYC
 );
 router.get('/kyc', authenticateJWT, kycController.getKYC);
+
+// --- CREDIT SCORING & RECOMMENDATION ENGINE ROUTES (Protected) ---
+router.get('/credit-score', authenticateJWT, creditScoreController.getCreditScore);
+router.post('/credit-score/recalculate', authenticateJWT, creditScoreController.recalculateCreditScore);
+router.get('/loans/recommendations', authenticateJWT, creditScoreController.getRecommendations);
+router.get('/financial-insights', authenticateJWT, creditScoreController.getFinancialInsights);
 
 // --- LOAN ROUTES (Protected) ---
 router.post('/loans/calculate', loanController.calculateLoan);
@@ -80,9 +87,11 @@ router.get('/reports/monthly-summary', authenticateJWT, reportController.getMont
 router.get('/reports/download-csv', authenticateJWT, reportController.downloadReportCsv);
 
 // --- AI FINANCIAL ADVISOR (Chatbot) ---
+router.get('/advisor/check', advisorController.checkAdvisorConfig);
 router.get('/advisor/status', authenticateJWT, advisorController.getAdvisorStatus);
 router.get('/advisor/history', authenticateJWT, advisorController.getChatHistory);
 router.post('/advisor/message', authenticateJWT, advisorController.sendMessage);
+router.post('/advisor/test-live', authenticateJWT, advisorController.testAdvisorLive);
 
 // --- ADMIN / LOAN OFFICER PORTAL ROUTES (Protected) ---
 router.get(

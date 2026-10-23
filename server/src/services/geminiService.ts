@@ -1,3 +1,4 @@
+import '../config/env';
 import { GoogleGenAI } from '@google/genai';
 
 export interface UserFinancialContext {
@@ -43,20 +44,93 @@ export class GeminiFinancialAdvisorService {
   }
 
   private getModelName(): string {
-    return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    return process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   }
 
   public isConfigured(): boolean {
     const key = this.getApiKey();
-    return Boolean(key && key.trim().length > 0 && !key.includes('your_gemini_api_key'));
+    return Boolean(
+      key &&
+      key.trim().length > 0 &&
+      !key.includes('your_gemini_api_key') &&
+      !key.includes('your_actual_key_here') &&
+      !key.includes('PLACEHOLDER')
+    );
   }
 
   public getStatus() {
+    const configured = this.isConfigured();
+    const key = this.getApiKey().trim();
     return {
       sdk: '@google/genai',
       model: this.getModelName(),
-      configured: this.isConfigured()
+      configured,
+      keyPresent: Boolean(key && !key.includes('your_gemini_api_key')),
+      keyLength: configured ? key.length : 0,
+      formatValid: configured ? (key.startsWith('AIza') || key.length > 20) : false
     };
+  }
+
+  /**
+   * Real, non-mock smoke test against Gemini API using the official @google/genai SDK.
+   * Reports live model connectivity and latency without logging or displaying the API key.
+   */
+  public async testConnection(): Promise<{
+    success: boolean;
+    reply?: string;
+    model: string;
+    latencyMs: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    const model = this.getModelName();
+
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        model,
+        latencyMs: 0,
+        error: 'GEMINI_API_KEY is not configured or is a placeholder in server/.env.'
+      };
+    }
+
+    try {
+      const apiKey = this.getApiKey();
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model,
+        contents: 'Ping: Reply with "Spendify Gemini connection verified."'
+      });
+
+      const reply = response.text ? response.text.trim() : '';
+      const latencyMs = Date.now() - startTime;
+
+      if (!reply) {
+        return {
+          success: false,
+          model,
+          latencyMs,
+          error: 'Received empty response from Gemini API.'
+        };
+      }
+
+      return {
+        success: true,
+        reply,
+        model,
+        latencyMs
+      };
+    } catch (error: any) {
+      const latencyMs = Date.now() - startTime;
+      const rawMsg = error?.message || String(error);
+      const sanitized = rawMsg.replace(/key=AIza[0-9A-Za-z-_]+/gi, 'key=[REDACTED]');
+      return {
+        success: false,
+        model,
+        latencyMs,
+        error: sanitized
+      };
+    }
   }
 
   public async askAdvisor(
@@ -136,11 +210,13 @@ export class GeminiFinancialAdvisorService {
         modelUsed: model
       };
     } catch (error: any) {
-      console.error('Gemini API execution error:', error?.message || error);
+      const rawMsg = error?.message || String(error);
+      const sanitized = rawMsg.replace(/key=AIza[0-9A-Za-z-_]+/gi, 'key=[REDACTED]');
+      console.error('Gemini API execution error:', sanitized);
       return {
         success: false,
         code: 'API_ERROR',
-        error: error?.message || 'Failed to communicate with Google Gemini API.',
+        error: sanitized || 'Failed to communicate with Google Gemini API.',
         setupInstructions:
           'Ensure your GEMINI_API_KEY has valid permissions and available quota in Google AI Studio.'
       };
@@ -184,8 +260,8 @@ FACTUAL FINANCIAL PROFILE:
 - Deterministic Available Monthly Surplus: ${surplusStr}
 - Liquid Emergency Savings: ${savingsStr}
 - Spending Breakdown: ${spendingCategories}
-- Credit Score: ${ctx.creditScore || '720'} / 900
-- Risk Assessment Tier: ${ctx.riskCategory || 'MEDIUM'}
+- Credit Score: ${ctx.creditScore ? `${ctx.creditScore} / 900` : 'Not yet assessed / Insufficient Telemetry'}
+- Risk Assessment Tier: ${ctx.riskCategory || 'UNASSESSED'}
 - Estimated Default Probability: ${ctx.defaultProbability ? (ctx.defaultProbability * 100).toFixed(1) + '%' : 'N/A'}
 - Financial Health Score: ${ctx.financialHealthScore || 75}/100
 - Active Loans: ${loanDetails}

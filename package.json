@@ -2,18 +2,37 @@
   "name": "spendify",
   "version": "1.0.0",
   "private": true,
-  "description": "SpendiFy - AI-Powered Micro-Lending Platform",
+  "description": "SpendiFy - AI-Powered Micro-Lending Platform (Vercel-Ready)",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "cd server && npx prisma generate && npm run build",
+    "build:client": "cd client && npm run build",
+    "vercel-build": "npm run build:server && npm run build:client",
+    "postinstall": "cd server && npx prisma generate",
+    "install:all": "cd client && npm install && cd ../server && npm install",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "dev:ai": "cd ai-service && uvicorn app.main:app --reload --port 8000",
-    "install:all": "cd client && npm install && cd ../server && npm install",
-    "db:migrate": "cd server && npx prisma migrate dev",
+    "dev:ai": "cd ai-service && .venv\\Scripts\\python -m app.main",
+    "db:generate": "cd server && npx prisma generate",
+    "db:migrate": "cd server && npx prisma migrate deploy",
     "db:seed": "cd server && npx tsx prisma/seed.ts",
     "db:studio": "cd server && npx prisma studio",
-    "build:client": "cd client && npm run build",
-    "build:server": "cd server && npm run build"
+    "test:gemini": "cd server && npm run test:gemini"
   },
-  "keywords": ["fintech", "lending", "ai", "credit-scoring"],
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.5"
+  },
+  "keywords": [
+    "fintech",
+    "lending",
+    "ai",
+    "credit-scoring",
+    "vercel"
+  ],
   "license": "MIT"
 }

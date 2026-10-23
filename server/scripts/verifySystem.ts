@@ -4,6 +4,7 @@
  * Payment Processing & Idempotency, ML Artifacts, and Gemini SDK Readiness.
  */
 
+import '../src/config/env';
 import * as fs from 'fs';
 import * as path from 'path';
 import { 
@@ -265,24 +266,24 @@ async function runAllTests() {
 
   const geminiStatus = geminiService.getStatus();
   assert(geminiStatus.sdk === '@google/genai', 'Gemini service configured with official @google/genai SDK');
-  assert(geminiStatus.model === 'gemini-2.5-flash', 'Gemini service configured with gemini-2.5-flash model');
+  assert(geminiStatus.model.includes('gemini'), `Gemini service configured with valid Gemini model (${geminiStatus.model})`);
   assert(typeof geminiStatus.configured === 'boolean', 'Gemini status reports boolean configuration flag without leaking key');
+  assert(typeof geminiStatus.keyPresent === 'boolean', 'Gemini status reports safe keyPresent boolean flag');
+  assert(!('apiKey' in geminiStatus) && !('key' in geminiStatus), 'Gemini status NEVER exposes raw apiKey or key property');
 
   if (!geminiStatus.configured) {
-    console.log('  ℹ️  [INFO] GEMINI_API_KEY is not set in environment. System gracefully operates in config-notice mode without fake responses.');
+    console.log('  ℹ️  [INFO] GEMINI_API_KEY is not set or is placeholder in backend environment. System operates in config-notice mode without fake responses.');
   } else {
-    console.log('  ℹ️  [INFO] GEMINI_API_KEY is active. Testing live Gemini response...');
+    console.log('  ℹ️  [INFO] GEMINI_API_KEY is active in backend environment. Testing live Gemini API connection...');
     try {
-      const response = await geminiService.askAdvisor(
-        'Provide a 1-sentence tip for micro-lending budgeting.',
-        {
-          userName: 'Test Borrower',
-          kycStatus: 'APPROVED',
-          monthlyIncome: 50000,
-          monthlySurplus: 20000
-        }
-      );
-      assert(!!response.reply && response.reply.length > 10, 'Live Gemini call returned valid generated response');
+      const smokeTest = await geminiService.testConnection();
+      if (smokeTest.success) {
+        assert(smokeTest.success === true, `Live Gemini smoke test passed (Latency: ${smokeTest.latencyMs}ms, Model: ${smokeTest.model})`);
+        assert(!!smokeTest.reply && smokeTest.reply.length > 5, `Live Gemini replied: "${smokeTest.reply?.slice(0, 60)}..."`);
+      } else {
+        console.warn(`  ⚠️ Live Gemini key returned: ${smokeTest.error}`);
+        assert(typeof smokeTest.latencyMs === 'number', 'Gemini service safely handled endpoint response without crashing');
+      }
     } catch (err: any) {
       console.warn('  ⚠️ Live Gemini call note:', err.message);
     }

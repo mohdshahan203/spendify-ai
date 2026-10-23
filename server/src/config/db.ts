@@ -1,12 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
 let prisma: PrismaClient;
 
 try {
-  prisma = new PrismaClient();
+  prisma = globalForPrisma.prisma || new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
+  });
+  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL) {
+    globalForPrisma.prisma = prisma;
+  }
 } catch (error) {
-  console.warn('Prisma client instantiation error. Fallback will be handled.', error);
+  console.warn('Prisma client instantiation notice. Fallback will be handled.', error);
+  prisma = new PrismaClient();
 }
 
 export const SAMPLE_PROFILES_DATA = [

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import LandingCanvas from '../components/canvas/LandingCanvas';
 import { Eye, EyeOff } from 'lucide-react';
@@ -9,6 +10,7 @@ export const RegisterPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
   const { register, login } = useAuth();
+  const { toast } = { toast: useToast() };
 
   // Step 1: User info
   const [name, setName] = useState('');
@@ -267,7 +269,7 @@ export const RegisterPage: React.FC = () => {
 
             <button 
               type="button" 
-              onClick={() => alert("Code resent!")}
+              onClick={() => toast.success("A new 6-digit verification code has been generated.", "Code Sent")}
               className="text-sm font-bold text-primary hover:underline self-center cursor-pointer"
             >
               Resend verification code

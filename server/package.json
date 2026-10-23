@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "import-offline-data": "npx tsx scripts/importOfflineCustomers.ts",
-    "test": "npx tsx scripts/verifySystem.ts"
+    "test": "npx tsx scripts/verifySystem.ts",
+    "test:gemini": "npx tsx scripts/verifyGemini.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

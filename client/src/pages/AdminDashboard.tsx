@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { KYCDocument, Loan } from '@shared/types';
 import { 
   Users, 
@@ -18,6 +19,7 @@ import {
 
 export const AdminDashboard: React.FC = () => {
   const { logout } = useAuth();
+  const { toast } = { toast: useToast() };
   const navigate = useNavigate();
   
   // States
@@ -68,12 +70,12 @@ export const AdminDashboard: React.FC = () => {
         status,
         notes: auditNotes
       });
-      alert(`User profile has been successfully ${status.toLowerCase()}ed.`);
+      toast.success(`User verification status updated to ${status}.`, 'KYC Audit Recorded');
       setAuditUserKyc(null);
       setAuditNotes('');
       fetchAdminData();
-    } catch (err) {
-      alert('Failed to submit verification status.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to submit verification status.', 'Audit Error');
     } finally {
       setAuditing(false);
     }
@@ -83,10 +85,10 @@ export const AdminDashboard: React.FC = () => {
   const handleReviewLoan = async (loanId: string, status: 'APPROVED' | 'REJECTED') => {
     try {
       await api.post('/admin/review-loan', { loanId, status });
-      alert(`Loan application ${status.toLowerCase()}ed successfully.`);
+      toast.success(`Loan application has been ${status.toLowerCase()}ed.`, 'Loan Decision Processed');
       fetchAdminData();
-    } catch (err) {
-      alert('Failed to review loan application.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to review loan application.', 'Review Error');
     }
   };
 
@@ -116,9 +118,10 @@ export const AdminDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/model-lab')} 
-            className="text-xs px-4 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 active:scale-[0.98] transition-all font-bold cursor-pointer flex items-center gap-1.5"
+            className="text-xs px-4 py-2 rounded-xl border border-emerald-300 bg-accent text-primary hover:bg-emerald-100 active:scale-[0.98] transition-all font-bold cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
-            📊 Model Lab
+            <PieChart size={14} className="text-primary" />
+            <span>AI Model Lab</span>
           </button>
           <button 
             onClick={logout} 
@@ -494,11 +497,11 @@ export const AdminDashboard: React.FC = () => {
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
                     <div>
                       <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Credit Score</span>
-                      <span className="font-extrabold text-primary text-base">{prof.creditScore}</span>
+                      <span className="font-extrabold text-primary text-base">{prof.creditScore || 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Financial Health</span>
-                      <span className="font-bold text-slate-800 text-sm">{prof.financialHealth}%</span>
+                      <span className="font-bold text-slate-800 text-sm">{prof.financialHealth ? `${prof.financialHealth}%` : 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Savings Rate</span>

@@ -30,6 +30,30 @@ async function fixAndVerifyPasswords() {
 
   console.log('✅ Admin user reset: admin@spendify.com -> Admin@123');
 
+  // 1b. Loan Officer account
+  const officerHash = await bcrypt.hash('Officer@123', 10);
+  let officer = await dbService.user.findUnique({ where: { email: 'officer@spendify.com' } });
+  if (officer) {
+    await dbService.user.update({
+      where: { id: officer.id },
+      data: {
+        passwordHash: officerHash,
+        role: 'OFFICER'
+      }
+    });
+  } else {
+    await dbService.user.create({
+      data: {
+        email: 'officer@spendify.com',
+        phone: '+919999999992',
+        passwordHash: officerHash,
+        name: 'Loan Officer Rajesh',
+        role: 'OFFICER'
+      }
+    });
+  }
+  console.log('✅ Loan Officer reset: officer@spendify.com -> Officer@123');
+
   // 2. Update all borrowers to Borrower@123
   const allUsers = await dbService.user.findMany();
   const borrowers = allUsers.filter((u: any) => u.role === 'BORROWER');

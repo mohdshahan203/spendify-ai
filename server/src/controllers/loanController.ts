@@ -219,19 +219,29 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
       const mlRes = await axios.post(`${ML_SERVICE_URL}/api/ml/predict`, mlPayload, { timeout: 8000 });
       aiResponse = mlRes.data;
     } catch (mlErr: any) {
-      console.warn('ML Service inference failed or offline. Operating safely with rule-based fallback metrics.');
+      console.warn('ML Service inference failed or offline. Evaluating using deterministic telemetry scoring.');
+      const userTxs = await dbService.userTransaction.findMany({ where: { userId } });
+      const incomeTxs = userTxs.filter(t => t.type === 'INCOME');
+      const expenseTxs = userTxs.filter(t => t.type === 'EXPENSE');
+      const inc = incomeTxs.reduce((s, t) => s + t.amount, 0) || 50000;
+      const exp = expenseTxs.reduce((s, t) => s + t.amount, 0) || 25000;
+      const surplus = inc - exp - quote.emi;
+      const dtiRatio = (quote.emi / inc) * 100;
+      const defaultProbability = Math.min(0.85, Math.max(0.05, (dtiRatio / 100) * 0.6 + (surplus < 0 ? 0.3 : 0)));
+      const creditScore = Math.round(Math.max(300, Math.min(900, 900 - defaultProbability * 600)));
+      const riskCategory = defaultProbability >= 0.4 ? 'HIGH' : defaultProbability >= 0.2 ? 'MEDIUM' : 'LOW';
+
       aiResponse = {
-        creditScore: 710,
-        financialHealth: 75.0,
-        defaultProbability: 0.15,
-        riskCategory: 'LOW',
+        creditScore,
+        financialHealth: Math.round(100 - defaultProbability * 100),
+        defaultProbability: Math.round(defaultProbability * 100) / 100,
+        riskCategory,
         shapExplanation: {
-          pay_0: -0.15,
-          limit_bal: -0.12,
-          bill_amt1: 0.05
+          dti_exposure: Math.round(dtiRatio * 10) / 10,
+          surplus_buffer: surplus > 0 ? -0.1 : 0.2
         },
-        isRisky: false,
-        modelVersion: 'fallback-rules'
+        isRisky: riskCategory === 'HIGH',
+        modelVersion: 'deterministic-cashflow-v2'
       };
     }
 

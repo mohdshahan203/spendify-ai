@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import {
   BrainCircuit,
@@ -12,6 +13,8 @@ import {
   Sparkles,
   Info
 } from 'lucide-react';
+
+const AI_BASE_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000';
 
 export const ModelLab: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -38,7 +41,7 @@ export const ModelLab: React.FC = () => {
   useEffect(() => {
     const fetchModelInfo = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/model/info');
+        const response = await axios.get(`${AI_BASE_URL}/model/info`);
         setModelInfo(response.data);
       } catch (err: any) {
         setError(err.message || 'Failed to fetch model metrics');
@@ -87,7 +90,7 @@ export const ModelLab: React.FC = () => {
         }
       };
 
-      const res = await axios.post('http://localhost:8000/api/ml/predict', payload);
+      const res = await axios.post(`${AI_BASE_URL}/api/ml/predict`, payload);
       setLivePrediction(res.data);
     } catch (err: any) {
       setPredictError(err.response?.data?.detail || err.message || 'Inference call failed');
@@ -153,11 +156,17 @@ export const ModelLab: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              to="/admin"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              ← Back to Admin
+            </Link>
             <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               Deployed: {deployedModel.toUpperCase()} v{metrics.model_version || '2.0.0'}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-500 hidden sm:inline">
               {metrics.training_timestamp ? new Date(metrics.training_timestamp).toLocaleDateString() : 'Active'}
             </span>
           </div>

@@ -289,3 +289,83 @@ export interface LoanDraft {
   notes?: string;
   updatedAt: string;
 }
+
+// --- CREDIT ASSESSMENT & RECOMMENDATION ENGINE TYPES ---
+
+export interface CreditFactorItem {
+  feature: string;
+  name: string;
+  impact: 'POSITIVE' | 'NEGATIVE';
+  impactMagnitude: number;
+  description: string;
+}
+
+export interface CreditAssessmentResult {
+  creditScore: number;
+  scoreRange: { min: number; max: number };
+  previousScore: number | null;
+  scoreDelta: number | null;
+  riskCategory: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  defaultProbability: number;
+  financialHealth: number;
+  dataSufficiency: {
+    isSufficient: boolean;
+    quality: 'SUFFICIENT' | 'PRELIMINARY' | 'INSUFFICIENT';
+    message: string;
+    telemetryStats: {
+      transactionCount: number;
+      verifiedIncome: number;
+      monthlyExpenses: number;
+      totalRepaymentsCount: number;
+      onTimeRepaymentsCount: number;
+      overdueRepaymentsCount: number;
+      activeLoansCount: number;
+    };
+  };
+  positiveFactors: CreditFactorItem[];
+  negativeFactors: CreditFactorItem[];
+  shapExplanation: Record<string, number>;
+  topImpactFeatures: Array<{ feature_name: string; shap_value: number; impact: string }>;
+  explanation: string;
+  calculatedAt: string;
+  modelVersion: string;
+  modelUsed: string;
+}
+
+export interface DataDrivenRecommendation {
+  id: string;
+  category: 'AFFORDABILITY' | 'REPAYMENT' | 'CASH_FLOW' | 'CREDIT_BUILDING' | 'DATA_QUALITY';
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  condition: string;
+  supportingData: Record<string, any>;
+  suggestedAction: string;
+  reason: string;
+  tradeOff?: string;
+  isActionable: boolean;
+}
+
+export interface FinancialInsightsResult {
+  metrics: {
+    monthlyIncome: number;
+    monthlyExpenses: number;
+    disposableIncome: number;
+    existingDebtEmis: number;
+    debtToIncomeRatio: number;
+    savingsBuffer: number;
+    creditScore: number;
+    riskCategory: string;
+    incomeStability: 'STABLE' | 'MODERATE' | 'VOLATILE';
+    overdueRepaymentsCount: number;
+    onTimeRepaymentsCount: number;
+    transactionCount: number;
+    dataSufficiency: 'SUFFICIENT' | 'PRELIMINARY' | 'INSUFFICIENT';
+  };
+  creditAssessment: CreditAssessmentResult | null;
+  recommendations: DataDrivenRecommendation[];
+  activeAlertsCount: number;
+  upcomingRepayments: RepaymentScheduleItem[];
+  overdueRepayments: RepaymentScheduleItem[];
+  hasActiveLoans: boolean;
+  activeLoansCount: number;
+}
+

@@ -1,0 +1,114 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  phone        String        @unique
+  passwordHash String
+  name         String
+  role         String        @default("BORROWER")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  refreshToken String?
+
+  kycDoc       KYCDocument?
+  loans        Loan[]
+  alerts       Alert[]
+  chats        ChatHistory[]
+}
+
+model KYCDocument {
+  id                 String    @id @default(uuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aadhaarNumber      String?
+  aadhaarUrl         String?   // path/url to Aadhaar PDF
+  panNumber          String?
+  panUrl             String?   // path/url to PAN PDF
+  bankStatementUrl   String?   // path/url to Bank Statement PDF
+  esignatureUrl      String?   // path/url to E-signature PDF/Image
+  status             String    @default("NOT_STARTED")
+  verifiedAt         DateTime?
+  verifierNotes      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model Loan {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount         Float
+  tenureMonths   Int
+  interestRate   Float          // e.g. 12.5%
+  emi            Float          // Calculated monthly installment
+  status         String         @default("PENDING")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  transactions   Transaction[]
+  prediction     AIPrediction?
+  recommendation LoanRecommendation?
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  loanId      String
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount      Float
+  type        String   // "DISBURSEMENT", "EMI_PAYMENT", "LATE_FEE"
+  status      String   // "SUCCESS", "PENDING", "FAILED"
+  createdAt   DateTime @default(now())
+}
+
+model AIPrediction {
+  id                 String   @id @default(uuid())
+  loanId             String   @unique
+  loan               Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  creditScore        Int      // Traditional/Alternative range (300-900)
+  financialHealth    Float    // 0-100 score
+  defaultProbability Float    // 0.0 - 1.0 (XGBoost)
+  riskCategory       String   @default("MEDIUM") // RF classification
+  shapExplanation    String   // SHAP impact values stored as JSON string
+  recommendationNote String?
+  createdAt          DateTime @default(now())
+}
+
+model LoanRecommendation {
+  id              String   @id @default(uuid())
+  loanId          String   @unique
+  loan            Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  suggestedAmount Float
+  suggestedTenure Int
+  suggestedEmi    Float
+  suggestedRate   Float
+  rationale       String
+  createdAt       DateTime @default(now())
+}
+
+model Alert {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level       String   @default("GREEN")
+  triggerType String   // "INCOME_DROP", "EXPENSE_SPIKE", "MISSED_EMI", "PROBABILITY_SPIKE"
+  description String
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model ChatHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  isBot     Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

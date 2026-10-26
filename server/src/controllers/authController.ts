@@ -8,9 +8,12 @@ import { emailService } from '../services/emailService';
 const JWT_SECRET = process.env.JWT_SECRET || 'spendify_super_secret_jwt_key_123!';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'spendify_refresh_token_secret_987!';
 
-// Secure 6-digit OTP generator
+// Demo OTP constant for email verification testing & demonstration
+export const DEMO_OTP = '434710';
+
+// 6-digit OTP generator (returns demo OTP 434710)
 function generateSecureOTP(): string {
-  return crypto.randomInt(100000, 1000000).toString();
+  return DEMO_OTP;
 }
 
 // Secure SHA-256 hash for OTP at rest
@@ -54,13 +57,14 @@ export const register = async (req: Request, res: Response) => {
         const emailResult = await emailService.sendVerificationEmail(normalizedEmail, existingEmailUser.name, otp);
 
         return res.status(200).json({
-          message: 'An unverified account with this email already exists. A new verification code has been sent.',
+          message: 'An unverified account with this email already exists. Use demo verification code 434710.',
           email: normalizedEmail,
           unverified: true,
           emailDelivery: {
             delivered: emailResult.delivered,
-            simulated: emailResult.simulated,
-            notice: emailResult.notice
+            simulated: true,
+            notice: 'Demo mode active: Use code 434710 to verify immediately.',
+            devOtp: DEMO_OTP
           }
         });
       }
@@ -123,14 +127,14 @@ export const register = async (req: Request, res: Response) => {
 
     // Notice: Do NOT issue JWT tokens yet! Account is unverified until OTP is confirmed.
     res.status(201).json({
-      message: 'Registration successful! Please check your email for the 6-digit verification code.',
+      message: 'Registration successful! Use verification code 434710 to verify your email.',
       unverified: true,
       email: normalizedEmail,
       emailDelivery: {
         delivered: emailResult.delivered,
-        simulated: emailResult.simulated,
-        notice: emailResult.notice,
-        devOtp: process.env.NODE_ENV !== 'production' && emailResult.simulated ? otp : undefined
+        simulated: true,
+        notice: 'Demo mode active: Use code 434710 to verify immediately.',
+        devOtp: DEMO_OTP
       }
     });
   } catch (error: any) {
@@ -166,37 +170,41 @@ export const verifyOTP = async (req: Request, res: Response) => {
       });
     }
 
-    // Check maximum verification attempts (5 attempts limit)
-    const currentAttempts = user.otpAttempts || 0;
-    if (currentAttempts >= 5) {
-      return res.status(429).json({
-        error: 'Maximum verification attempts (5/5) exceeded. Please request a new verification code.',
-        maxAttemptsExceeded: true
-      });
-    }
+    const isDemoOtp = cleanOtp === DEMO_OTP;
 
-    // Check expiration (10-minute window)
-    if (!user.otpExpiresAt || new Date() > new Date(user.otpExpiresAt)) {
-      return res.status(400).json({
-        error: 'Verification code has expired. Please click "Resend Code" to receive a fresh code.',
-        expired: true
-      });
-    }
+    if (!isDemoOtp) {
+      // Check maximum verification attempts (5 attempts limit)
+      const currentAttempts = user.otpAttempts || 0;
+      if (currentAttempts >= 5) {
+        return res.status(429).json({
+          error: 'Maximum verification attempts (5/5) exceeded. Please request a new verification code.',
+          maxAttemptsExceeded: true
+        });
+      }
 
-    // Compare cryptographic hashes
-    const incomingHash = hashOTP(cleanOtp);
-    if (!user.otpHash || incomingHash !== user.otpHash) {
-      const updatedAttempts = currentAttempts + 1;
-      await dbService.user.update({
-        where: { id: user.id },
-        data: { otpAttempts: updatedAttempts }
-      });
+      // Check expiration (10-minute window)
+      if (!user.otpExpiresAt || new Date() > new Date(user.otpExpiresAt)) {
+        return res.status(400).json({
+          error: 'Verification code has expired. Please click "Resend Code" to receive a fresh code.',
+          expired: true
+        });
+      }
 
-      const remaining = Math.max(0, 5 - updatedAttempts);
-      return res.status(400).json({
-        error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
-        remainingAttempts: remaining
-      });
+      // Compare cryptographic hashes
+      const incomingHash = hashOTP(cleanOtp);
+      if (!user.otpHash || incomingHash !== user.otpHash) {
+        const updatedAttempts = currentAttempts + 1;
+        await dbService.user.update({
+          where: { id: user.id },
+          data: { otpAttempts: updatedAttempts }
+        });
+
+        const remaining = Math.max(0, 5 - updatedAttempts);
+        return res.status(400).json({
+          error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+          remainingAttempts: remaining
+        });
+      }
     }
 
     // OTP Verified! Mark verified and invalidate code atomically
@@ -300,13 +308,13 @@ export const resendOTP = async (req: Request, res: Response) => {
     const emailResult = await emailService.sendVerificationEmail(normalizedEmail, user.name, otp);
 
     res.status(200).json({
-      message: 'A new 6-digit verification code has been sent to your email.',
+      message: 'A new 6-digit verification code (434710) is ready.',
       email: normalizedEmail,
       emailDelivery: {
         delivered: emailResult.delivered,
-        simulated: emailResult.simulated,
-        notice: emailResult.notice,
-        devOtp: process.env.NODE_ENV !== 'production' && emailResult.simulated ? otp : undefined
+        simulated: true,
+        notice: 'Demo mode active: Use code 434710 to verify immediately.',
+        devOtp: DEMO_OTP
       }
     });
   } catch (error: any) {

@@ -27,7 +27,7 @@ export const RegisterPage: React.FC = () => {
   const [role, setRole] = useState('BORROWER');
 
   // Step 2: OTP Verification
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState(initialStep === 2 ? '434710' : '');
   const [resendCooldown, setResendCooldown] = useState(initialStep === 2 ? 0 : 60);
   const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
@@ -61,13 +61,16 @@ export const RegisterPage: React.FC = () => {
     try {
       const res = await register({ name, email, phone, password, role });
       
+      const demoCode = res?.emailDelivery?.devOtp || '434710';
+      setOtp(demoCode);
+
       if (res?.emailDelivery?.notice) {
         setDeliveryNotice(res.emailDelivery.notice);
       } else {
-        setDeliveryNotice(null);
+        setDeliveryNotice('Demo mode active: Use code 434710 to verify immediately.');
       }
 
-      toast.success(res?.message || 'Verification code sent to your email address.', 'Check Your Inbox');
+      toast.success('Registration successful! Demo OTP 434710 is ready.', 'Demo OTP: 434710');
       setResendCooldown(60);
       setRemainingAttempts(null);
       setStep(2);
@@ -116,7 +119,9 @@ export const RegisterPage: React.FC = () => {
 
     try {
       const res = await api.post('/auth/resend-otp', { email });
-      toast.success(res.data?.message || 'A new verification code has been dispatched.', 'OTP Sent');
+      const demoCode = res.data?.emailDelivery?.devOtp || '434710';
+      setOtp(demoCode);
+      toast.success('Demo verification code 434710 refreshed.', 'OTP: 434710');
       if (res.data?.emailDelivery?.notice) {
         setDeliveryNotice(res.data.emailDelivery.notice);
       }
@@ -351,6 +356,30 @@ export const RegisterPage: React.FC = () => {
                   (Change)
                 </button>
               </div>
+            </div>
+
+            {/* Demo OTP Helper Banner */}
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-[10px] font-black bg-amber-200 text-amber-900 rounded uppercase tracking-wider">
+                    Demo Code
+                  </span>
+                  <span className="font-mono font-black text-lg text-slate-900 tracking-wider">
+                    434710
+                  </span>
+                </div>
+                <span className="text-[11px] text-amber-800 font-medium mt-0.5">
+                  Email verification bypass enabled: Use <strong>434710</strong> to verify immediately.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOtp('434710')}
+                className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold text-xs transition-colors cursor-pointer active:scale-95 flex-shrink-0"
+              >
+                Auto-fill
+              </button>
             </div>
 
             {deliveryNotice && (

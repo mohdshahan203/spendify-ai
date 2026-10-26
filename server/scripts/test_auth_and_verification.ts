@@ -46,6 +46,7 @@ async function runAuthAndVerificationTests() {
     assert(registerRes.data.emailDelivery !== undefined, 'Email delivery information object returned');
     
     serverOtp = registerRes.data.emailDelivery?.devOtp;
+    assert(serverOtp === '434710', `Demo OTP matches expected 434710: ${serverOtp}`);
     assert(Boolean(serverOtp) && /^\d{6}$/.test(serverOtp), `6-digit cryptographic OTP generated: ${serverOtp}`);
     console.log(`    Delivery Mode: ${registerRes.data.emailDelivery?.simulated ? 'Simulated Local/Dev' : 'Live SMTP'}`);
   } catch (err: any) {

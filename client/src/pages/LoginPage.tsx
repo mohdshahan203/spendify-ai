@@ -113,12 +113,16 @@ export const LoginPage: React.FC = () => {
             </span>
             <p className="text-slate-600 leading-relaxed">
               Your account with <strong className="text-slate-800">{unverifiedEmail}</strong> requires a 6-digit OTP confirmation to activate.
+              <br />
+              <span className="inline-block mt-1 font-semibold text-amber-900">
+                Demo Verification Code: <span className="font-mono font-black text-slate-900 bg-amber-200/80 px-2 py-0.5 rounded">434710</span>
+              </span>
             </p>
             <Link
               to={`/register?step=2&email=${encodeURIComponent(unverifiedEmail)}`}
               className="mt-1 self-start px-3.5 py-2 rounded-xl bg-primary text-white font-bold hover:bg-[#1B5E20] transition-all text-xs shadow-xs"
             >
-              Enter Verification Code →
+              Enter Verification Code (434710) →
             </Link>
           </div>
         )}

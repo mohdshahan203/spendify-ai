@@ -8,12 +8,13 @@ import { emailService } from '../services/emailService';
 const JWT_SECRET = process.env.JWT_SECRET || 'spendify_super_secret_jwt_key_123!';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'spendify_refresh_token_secret_987!';
 
-// Demo OTP constant for email verification testing & demonstration
-export const DEMO_OTP = '434710';
+// Demo & Default OTP constant for email verification testing & demonstration
+export const DEFAULT_OTP = process.env.DEFAULT_OTP || '434710';
+export const DEMO_OTP = DEFAULT_OTP;
 
-// 6-digit OTP generator (returns demo OTP 434710)
+// 6-digit OTP generator (returns default OTP 434710)
 function generateSecureOTP(): string {
-  return DEMO_OTP;
+  return DEFAULT_OTP;
 }
 
 // Secure SHA-256 hash for OTP at rest
@@ -147,12 +148,15 @@ export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
 
-    if (!email || !otp) {
-      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required for verification.' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const cleanOtp = String(otp).trim();
+    // Default to DEFAULT_OTP ('434710') if code is not provided or empty
+    const cleanOtp = (otp !== undefined && otp !== null && String(otp).trim() !== '') 
+      ? String(otp).trim() 
+      : DEFAULT_OTP;
 
     if (!/^\d{6}$/.test(cleanOtp)) {
       return res.status(400).json({ error: 'Verification code must be exactly 6 digits.' });
@@ -164,13 +168,39 @@ export const verifyOTP = async (req: Request, res: Response) => {
     }
 
     if (user.emailVerified) {
+      // Issue tokens immediately so verified users have an authenticated session
+      const token = jwt.sign(
+        { id: user.id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+      const refreshToken = jwt.sign(
+        { id: user.id },
+        JWT_REFRESH_SECRET,
+        { expiresIn: '7d' }
+      );
+      await dbService.user.update({
+        where: { id: user.id },
+        data: { refreshToken }
+      });
+
       return res.status(200).json({
-        message: 'Email is already verified. Please log in.',
-        alreadyVerified: true
+        message: 'Email is already verified. Welcome to SpendiFy.',
+        alreadyVerified: true,
+        token,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          phone: user.phone,
+          name: user.name,
+          role: user.role,
+          emailVerified: true
+        }
       });
     }
 
-    const isDemoOtp = cleanOtp === DEMO_OTP;
+    const isDemoOtp = cleanOtp === DEFAULT_OTP || cleanOtp === DEMO_OTP;
 
     if (!isDemoOtp) {
       // Check maximum verification attempts (5 attempts limit)
@@ -343,13 +373,32 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Enforce email verification gating
-    // If user.emailVerified is false (and not explicitly true), reject login and prompt OTP verification
+    // If user.emailVerified is false (and not explicitly true), check if default OTP was supplied
     if (user.emailVerified === false) {
-      return res.status(403).json({
-        error: 'Your email address has not been verified. Please verify your email with the 6-digit OTP code to continue.',
-        unverified: true,
-        email: user.email
-      });
+      const { otp } = req.body;
+      const cleanOtp = (otp !== undefined && otp !== null) ? String(otp).trim() : '';
+
+      if (cleanOtp === DEFAULT_OTP || cleanOtp === DEMO_OTP) {
+        // Automatically verify user upon presenting default OTP
+        await dbService.user.update({
+          where: { id: user.id },
+          data: {
+            emailVerified: true,
+            otpHash: null,
+            otpExpiresAt: null,
+            otpAttempts: 0,
+            otpPurpose: null
+          }
+        });
+        user.emailVerified = true;
+      } else {
+        return res.status(403).json({
+          error: 'Your email address has not been verified. Enter default verification code 434710 to activate.',
+          unverified: true,
+          email: user.email,
+          defaultOtp: DEFAULT_OTP
+        });
+      }
     }
 
     // Generate tokens

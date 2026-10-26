@@ -26,8 +26,8 @@ export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('BORROWER');
 
-  // Step 2: OTP Verification
-  const [otp, setOtp] = useState(initialStep === 2 ? '434710' : '');
+  // Step 2: OTP Verification (Defaults to 434710)
+  const [otp, setOtp] = useState('434710');
   const [resendCooldown, setResendCooldown] = useState(initialStep === 2 ? 0 : 60);
   const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
@@ -81,10 +81,11 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
-  // Step 2 Submit: Verify 6-digit cryptographic OTP
+  // Step 2 Submit: Verify 6-digit cryptographic OTP (Defaults to 434710)
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length !== 6) {
+    const codeToVerify = (otp && otp.trim().length > 0) ? otp.trim() : '434710';
+    if (codeToVerify.length !== 6) {
       setError('Please enter the complete 6-digit verification code.');
       return;
     }
@@ -92,7 +93,7 @@ export const RegisterPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await verifyOTP(email, otp);
+      const res = await verifyOTP(email, codeToVerify);
       toast.success(res?.message || 'Email verified successfully!', 'Account Verified');
       
       if (role === 'BORROWER') {
@@ -358,19 +359,19 @@ export const RegisterPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Demo OTP Helper Banner */}
+            {/* Default OTP Helper Banner */}
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex items-center justify-between gap-3 shadow-xs">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-0.5 text-[10px] font-black bg-amber-200 text-amber-900 rounded uppercase tracking-wider">
-                    Demo Code
+                    Default OTP Active
                   </span>
                   <span className="font-mono font-black text-lg text-slate-900 tracking-wider">
                     434710
                   </span>
                 </div>
                 <span className="text-[11px] text-amber-800 font-medium mt-0.5">
-                  Email verification bypass enabled: Use <strong>434710</strong> to verify immediately.
+                  Email verification is bypassed: Default OTP <strong>434710</strong> is auto-filled below.
                 </span>
               </div>
               <button
@@ -378,7 +379,7 @@ export const RegisterPage: React.FC = () => {
                 onClick={() => setOtp('434710')}
                 className="px-3 py-1.5 rounded-xl bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold text-xs transition-colors cursor-pointer active:scale-95 flex-shrink-0"
               >
-                Auto-fill
+                Reset 434710
               </button>
             </div>
 
@@ -403,27 +404,27 @@ export const RegisterPage: React.FC = () => {
                   required
                   autoFocus
                   className="w-64 text-center tracking-[0.8em] font-extrabold text-3xl px-4 py-4 rounded-2xl border-2 border-slate-300 bg-white text-slate-900 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 shadow-inner"
-                  placeholder="••••••"
+                  placeholder="434710"
                 />
               </div>
 
               <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
                 <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span>Code expires in <strong>10 minutes</strong></span>
+                <span>Default verification code: <strong>434710</strong></span>
               </div>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 text-center">
-              🔒 <strong>Security Warning:</strong> SpendiFy will never ask for your verification code. Do not share this code with anyone.
+              🔒 <strong>Quick Verification:</strong> Click below to verify instantly with default code <strong>434710</strong>.
             </div>
 
             <button
               type="submit"
-              disabled={loading || otp.length !== 6}
+              disabled={loading}
               className="w-full py-4 rounded-xl font-bold bg-primary text-white hover:bg-[#1B5E20] active:scale-[0.98] shadow-md transition-all text-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <KeyRound className="w-5 h-5" />
-              <span>{loading ? 'Verifying Code...' : 'Verify & Continue'}</span>
+              <span>{loading ? 'Verifying Code...' : 'Verify with Default OTP (434710) & Continue'}</span>
             </button>
 
             <div className="flex flex-col items-center gap-3">
@@ -588,6 +589,16 @@ export const RegisterPage: React.FC = () => {
             >
               {loading ? 'Uploading documents...' : 'Submit Documents'}
             </button>
+
+            <div className="flex justify-center mt-3">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="text-xs font-bold text-slate-500 hover:text-primary transition-colors cursor-pointer underline"
+              >
+                Skip document upload for now → Go to Borrower Dashboard
+              </button>
+            </div>
           </form>
         )}
 

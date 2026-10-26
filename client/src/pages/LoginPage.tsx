@@ -13,7 +13,7 @@ export const LoginPage: React.FC = () => {
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const { login } = useAuth();
+  const { login, verifyOTP } = useAuth();
   const { toast } = { toast: useToast() };
   const navigate = useNavigate();
 
@@ -107,23 +107,48 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {unverifiedEmail && (
-          <div className="p-4 mb-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col gap-2 shadow-xs">
-            <span className="font-bold flex items-center gap-1.5">
+          <div className="p-4 mb-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col gap-2.5 shadow-xs">
+            <span className="font-bold flex items-center gap-1.5 text-sm text-amber-950">
               ⚠️ Email Verification Required
             </span>
             <p className="text-slate-600 leading-relaxed">
-              Your account with <strong className="text-slate-800">{unverifiedEmail}</strong> requires a 6-digit OTP confirmation to activate.
+              Your account with <strong className="text-slate-800">{unverifiedEmail}</strong> requires email verification.
               <br />
               <span className="inline-block mt-1 font-semibold text-amber-900">
-                Demo Verification Code: <span className="font-mono font-black text-slate-900 bg-amber-200/80 px-2 py-0.5 rounded">434710</span>
+                Default Verification Code: <span className="font-mono font-black text-slate-900 bg-amber-200/90 px-2 py-0.5 rounded border border-amber-300">434710</span>
               </span>
             </p>
-            <Link
-              to={`/register?step=2&email=${encodeURIComponent(unverifiedEmail)}`}
-              className="mt-1 self-start px-3.5 py-2 rounded-xl bg-primary text-white font-bold hover:bg-[#1B5E20] transition-all text-xs shadow-xs"
-            >
-              Enter Verification Code (434710) →
-            </Link>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const data = await verifyOTP(unverifiedEmail, '434710');
+                    toast.success('Email verified successfully with default OTP 434710!', 'Account Activated');
+                    if (data?.user?.role === 'ADMIN' || data?.user?.role === 'OFFICER') {
+                      navigate('/admin');
+                    } else {
+                      navigate('/dashboard');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.error || 'Verification failed. Please try again.', 'Error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="px-3.5 py-2 rounded-xl bg-primary text-white font-bold hover:bg-[#1B5E20] transition-all text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <span>⚡ Verify with 434710 & Log In</span>
+              </button>
+              <Link
+                to={`/register?step=2&email=${encodeURIComponent(unverifiedEmail)}`}
+                className="px-3.5 py-2 rounded-xl border border-amber-300 bg-white text-slate-700 font-bold hover:bg-amber-100 transition-all text-xs"
+              >
+                Enter Code Manually →
+              </Link>
+            </div>
           </div>
         )}
 

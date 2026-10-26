@@ -2,7 +2,6 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { dbService } from '../services/dbService';
 import { evaluateFinancialWarnings } from '../services/loanMathService';
-import { SAMPLE_PROFILES_DATA } from '../config/db';
 
 export const getAlerts = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -17,11 +16,18 @@ export const getAlerts = async (req: AuthenticatedRequest, res: Response) => {
     const userLoans = await dbService.loan.findMany({ where: { userId } });
     const activeLoans = userLoans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
     const repayments = await dbService.repaymentSchedule.findMany({ where: { loan: { userId } } });
+    const userTxs = await dbService.userTransaction.findMany({ where: { userId } });
 
-    const matchedProfile = SAMPLE_PROFILES_DATA.find(p => p.email === userRecord?.email);
-    const monthlyIncome = matchedProfile?.spendingHabits?.monthlyIncome || 50000;
-    const essentialExpenses = matchedProfile?.spendingHabits?.monthlyExpenses || 26000;
-    const existingDebtEmis = activeLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
+    // Derive genuine income and expenses from authorized records
+    const incomeTxs = userTxs.filter((t: any) => t.type === 'INCOME');
+    const expenseTxs = userTxs.filter((t: any) => t.type === 'EXPENSE');
+    const monthlyIncome = incomeTxs.length > 0
+      ? Math.round(incomeTxs.reduce((sum: number, t: any) => sum + t.amount, 0) / Math.max(1, new Set(incomeTxs.map((t: any) => t.date.slice(0, 7))).size))
+      : 0;
+    const essentialExpenses = expenseTxs.length > 0
+      ? Math.round(expenseTxs.reduce((sum: number, t: any) => sum + t.amount, 0) / Math.max(1, new Set(expenseTxs.map((t: any) => t.date.slice(0, 7))).size))
+      : 0;
+    const existingDebtEmis = activeLoans.reduce((sum: number, l: any) => sum + (Number(l.emi) || 0), 0);
     const monthlySurplus = monthlyIncome - essentialExpenses - existingDebtEmis;
 
     // Evaluate dynamic rules

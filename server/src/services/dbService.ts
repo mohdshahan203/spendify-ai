@@ -519,7 +519,14 @@ export const dbService = {
 
   // --- USER TRANSACTION & EXPENSE TRACKER OPERATIONS ---
   userTransaction: {
-    findMany: async (args?: { where?: { userId?: string; type?: string; category?: string } }) => {
+    findMany: async (args?: { where?: { userId?: string; type?: string; category?: string }; orderBy?: any }) => {
+      if (!useMock && (prisma as any).userTransaction) {
+        try {
+          return await (prisma as any).userTransaction.findMany(args);
+        } catch {
+          useMock = true;
+        }
+      }
       let list = mockDb.userTransactions;
       if (args?.where?.userId) {
         list = list.filter(t => t.userId === args.where!.userId);
@@ -533,9 +540,23 @@ export const dbService = {
       return list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
     },
     findUnique: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).userTransaction) {
+        try {
+          return await (prisma as any).userTransaction.findUnique(args);
+        } catch {
+          useMock = true;
+        }
+      }
       return mockDb.userTransactions.find(t => t.id === args.where.id) || null;
     },
     create: async (args: { data: any }) => {
+      if (!useMock && (prisma as any).userTransaction) {
+        try {
+          return await (prisma as any).userTransaction.create(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const newTx = {
         id: 'tx-' + Math.random().toString(36).substring(2, 11),
         createdAt: new Date(),
@@ -545,6 +566,13 @@ export const dbService = {
       return newTx;
     },
     update: async (args: { where: { id: string }; data: any }) => {
+      if (!useMock && (prisma as any).userTransaction) {
+        try {
+          return await (prisma as any).userTransaction.update(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.userTransactions.findIndex(t => t.id === args.where.id);
       if (idx !== -1) {
         mockDb.userTransactions[idx] = { ...mockDb.userTransactions[idx], ...args.data };
@@ -553,6 +581,13 @@ export const dbService = {
       throw new Error('Transaction not found');
     },
     delete: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).userTransaction) {
+        try {
+          return await (prisma as any).userTransaction.delete(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.userTransactions.findIndex(t => t.id === args.where.id);
       if (idx !== -1) {
         const deleted = mockDb.userTransactions.splice(idx, 1)[0];
@@ -565,6 +600,13 @@ export const dbService = {
   // --- BUDGET OPERATIONS ---
   budget: {
     findMany: async (args?: { where?: { userId?: string; month?: string } }) => {
+      if (!useMock && (prisma as any).budget) {
+        try {
+          return await (prisma as any).budget.findMany(args);
+        } catch {
+          useMock = true;
+        }
+      }
       let list = mockDb.budgets;
       if (args?.where?.userId) {
         list = list.filter(b => b.userId === args.where!.userId);
@@ -575,6 +617,13 @@ export const dbService = {
       return list;
     },
     upsert: async (args: { where: { userId_month_category: { userId: string; month: string; category: string } }; update: any; create: any }) => {
+      if (!useMock && (prisma as any).budget) {
+        try {
+          return await (prisma as any).budget.upsert(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const { userId, month, category } = args.where.userId_month_category;
       const idx = mockDb.budgets.findIndex(b => b.userId === userId && b.month === month && b.category === category);
       if (idx !== -1) {
@@ -594,6 +643,13 @@ export const dbService = {
       }
     },
     delete: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).budget) {
+        try {
+          return await (prisma as any).budget.delete(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.budgets.findIndex(b => b.id === args.where.id);
       if (idx !== -1) {
         return mockDb.budgets.splice(idx, 1)[0];
@@ -605,6 +661,13 @@ export const dbService = {
   // --- SAVINGS GOALS OPERATIONS ---
   savingsGoal: {
     findMany: async (args?: { where?: { userId?: string; isArchived?: boolean } }) => {
+      if (!useMock && (prisma as any).savingsGoal) {
+        try {
+          return await (prisma as any).savingsGoal.findMany(args);
+        } catch {
+          useMock = true;
+        }
+      }
       let list = mockDb.savingsGoals;
       if (args?.where?.userId) {
         list = list.filter(g => g.userId === args.where!.userId);
@@ -615,9 +678,23 @@ export const dbService = {
       return list.sort((a, b) => new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime());
     },
     findUnique: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).savingsGoal) {
+        try {
+          return await (prisma as any).savingsGoal.findUnique(args);
+        } catch {
+          useMock = true;
+        }
+      }
       return mockDb.savingsGoals.find(g => g.id === args.where.id) || null;
     },
     create: async (args: { data: any }) => {
+      if (!useMock && (prisma as any).savingsGoal) {
+        try {
+          return await (prisma as any).savingsGoal.create(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const newGoal = {
         id: 'goal-' + Math.random().toString(36).substring(2, 11),
         currentAmount: 0,
@@ -630,6 +707,13 @@ export const dbService = {
       return newGoal;
     },
     update: async (args: { where: { id: string }; data: any }) => {
+      if (!useMock && (prisma as any).savingsGoal) {
+        try {
+          return await (prisma as any).savingsGoal.update(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.savingsGoals.findIndex(g => g.id === args.where.id);
       if (idx !== -1) {
         mockDb.savingsGoals[idx] = { ...mockDb.savingsGoals[idx], ...args.data, updatedAt: new Date() };
@@ -638,6 +722,13 @@ export const dbService = {
       throw new Error('Savings goal not found');
     },
     delete: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).savingsGoal) {
+        try {
+          return await (prisma as any).savingsGoal.delete(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.savingsGoals.findIndex(g => g.id === args.where.id);
       if (idx !== -1) {
         return mockDb.savingsGoals.splice(idx, 1)[0];
@@ -649,6 +740,13 @@ export const dbService = {
   // --- SAVED LOAN SCENARIOS OPERATIONS ---
   savedScenario: {
     findMany: async (args?: { where?: { userId?: string } }) => {
+      if (!useMock && (prisma as any).savedScenario) {
+        try {
+          return await (prisma as any).savedScenario.findMany(args);
+        } catch {
+          useMock = true;
+        }
+      }
       let list = mockDb.savedScenarios;
       if (args?.where?.userId) {
         list = list.filter(s => s.userId === args.where!.userId);
@@ -656,6 +754,13 @@ export const dbService = {
       return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
     create: async (args: { data: any }) => {
+      if (!useMock && (prisma as any).savedScenario) {
+        try {
+          return await (prisma as any).savedScenario.create(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const newScenario = {
         id: 'scen-' + Math.random().toString(36).substring(2, 11),
         createdAt: new Date(),
@@ -665,6 +770,13 @@ export const dbService = {
       return newScenario;
     },
     delete: async (args: { where: { id: string } }) => {
+      if (!useMock && (prisma as any).savedScenario) {
+        try {
+          return await (prisma as any).savedScenario.delete(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.savedScenarios.findIndex(s => s.id === args.where.id);
       if (idx !== -1) {
         return mockDb.savedScenarios.splice(idx, 1)[0];
@@ -676,9 +788,23 @@ export const dbService = {
   // --- LOAN APPLICATION DRAFT OPERATIONS ---
   loanDraft: {
     findUnique: async (args: { where: { userId: string } }) => {
+      if (!useMock && (prisma as any).loanDraft) {
+        try {
+          return await (prisma as any).loanDraft.findUnique(args);
+        } catch {
+          useMock = true;
+        }
+      }
       return mockDb.loanDrafts.find(d => d.userId === args.where.userId) || null;
     },
     upsert: async (args: { where: { userId: string }; create: any; update: any }) => {
+      if (!useMock && (prisma as any).loanDraft) {
+        try {
+          return await (prisma as any).loanDraft.upsert(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.loanDrafts.findIndex(d => d.userId === args.where.userId);
       if (idx !== -1) {
         mockDb.loanDrafts[idx] = { ...mockDb.loanDrafts[idx], ...args.update, updatedAt: new Date() };
@@ -695,6 +821,13 @@ export const dbService = {
       }
     },
     delete: async (args: { where: { userId: string } }) => {
+      if (!useMock && (prisma as any).loanDraft) {
+        try {
+          return await (prisma as any).loanDraft.delete(args);
+        } catch {
+          useMock = true;
+        }
+      }
       const idx = mockDb.loanDrafts.findIndex(d => d.userId === args.where.userId);
       if (idx !== -1) {
         return mockDb.loanDrafts.splice(idx, 1)[0];

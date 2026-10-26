@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { dbService } from './dbService';
-import { SAMPLE_PROFILES_DATA } from '../config/db';
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
@@ -104,22 +103,19 @@ export async function extractBorrowerFeatures(userId: string) {
     allRepayments = allRepayments.concat(reps);
   }
 
-  // Calculate actual income & expense from verified transactions
+  // Calculate actual income & expense strictly from verified user transactions
   const incomeTxs = userTxs.filter(t => t.type === 'INCOME');
   const expenseTxs = userTxs.filter(t => t.type === 'EXPENSE');
 
-  // Fallback to sample profile if user has zero transactions recorded yet
-  const sampleProfile = SAMPLE_PROFILES_DATA.find(p => p.email === user?.email);
-
   const totalIncomeAmount = incomeTxs.reduce((sum, t) => sum + t.amount, 0);
   const avgMonthlyIncome = incomeTxs.length > 0
-    ? totalIncomeAmount / Math.max(1, new Set(incomeTxs.map(t => t.date.slice(0, 7))).size)
-    : (sampleProfile?.spendingHabits?.monthlyIncome || 50000);
+    ? Math.round(totalIncomeAmount / Math.max(1, new Set(incomeTxs.map(t => t.date.slice(0, 7))).size))
+    : 0;
 
   const totalExpenseAmount = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
   const avgMonthlyExpense = expenseTxs.length > 0
-    ? totalExpenseAmount / Math.max(1, new Set(expenseTxs.map(t => t.date.slice(0, 7))).size)
-    : (sampleProfile?.spendingHabits?.monthlyExpenses || 25000);
+    ? Math.round(totalExpenseAmount / Math.max(1, new Set(expenseTxs.map(t => t.date.slice(0, 7))).size))
+    : 0;
 
   // Group monthly expenses for last 6 months (BILL_AMT1 to BILL_AMT6)
   const now = new Date();

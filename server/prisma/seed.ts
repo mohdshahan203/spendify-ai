@@ -325,13 +325,14 @@ async function main() {
   // 1. Seed Admin
   await prisma.user.upsert({
     where: { email: 'admin@spendify.com' },
-    update: {},
+    update: { emailVerified: true },
     create: {
       email: 'admin@spendify.com',
       phone: '+919999999991',
       passwordHash: adminHash,
       name: 'System Admin',
       role: 'ADMIN',
+      emailVerified: true,
     },
   });
 
@@ -339,13 +340,14 @@ async function main() {
   for (const prof of SAMPLE_PROFILES_DATA) {
     const user = await prisma.user.upsert({
       where: { email: prof.email },
-      update: { name: prof.name, phone: prof.phone },
+      update: { name: prof.name, phone: prof.phone, emailVerified: true },
       create: {
         email: prof.email,
         phone: prof.phone,
         passwordHash,
         name: prof.name,
-        role: 'BORROWER'
+        role: 'BORROWER',
+        emailVerified: true,
       }
     });
 

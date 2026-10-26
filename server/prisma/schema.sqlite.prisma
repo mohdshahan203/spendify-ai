@@ -8,37 +8,48 @@ generator client {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  phone        String        @unique
-  passwordHash String
-  name         String
-  role         String        @default("BORROWER")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  refreshToken String?
+  id            String        @id @default(uuid())
+  email         String        @unique
+  phone         String        @unique
+  passwordHash  String
+  name          String
+  role          String        @default("BORROWER")
+  emailVerified Boolean       @default(false)
+  otpHash       String?
+  otpExpiresAt  DateTime?
+  otpAttempts   Int           @default(0)
+  otpLastSentAt DateTime?
+  otpPurpose    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  refreshToken  String?
 
-  kycDoc       KYCDocument?
-  loans        Loan[]
-  alerts       Alert[]
-  chats        ChatHistory[]
+  kycDoc           KYCDocument?
+  loans            Loan[]
+  alerts           Alert[]
+  chats            ChatHistory[]
+  userTransactions UserTransaction[]
+  budgets          Budget[]
+  savingsGoals     SavingsGoal[]
+  savedScenarios   SavedScenario[]
+  loanDraft        LoanDraft?
 }
 
 model KYCDocument {
-  id                 String    @id @default(uuid())
-  userId             String    @unique
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  aadhaarNumber      String?
-  aadhaarUrl         String?   // path/url to Aadhaar PDF
-  panNumber          String?
-  panUrl             String?   // path/url to PAN PDF
-  bankStatementUrl   String?   // path/url to Bank Statement PDF
-  esignatureUrl      String?   // path/url to E-signature PDF/Image
-  status             String    @default("NOT_STARTED")
-  verifiedAt         DateTime?
-  verifierNotes      String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aadhaarNumber    String?
+  aadhaarUrl       String?   // path/url to Aadhaar PDF
+  panNumber        String?
+  panUrl           String?   // path/url to PAN PDF
+  bankStatementUrl String?   // path/url to Bank Statement PDF
+  esignatureUrl    String?   // path/url to E-signature PDF/Image
+  status           String    @default("NOT_STARTED")
+  verifiedAt       DateTime?
+  verifierNotes    String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Loan {
@@ -53,9 +64,10 @@ model Loan {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  transactions   Transaction[]
-  prediction     AIPrediction?
-  recommendation LoanRecommendation?
+  transactions      Transaction[]
+  prediction        AIPrediction?
+  recommendation    LoanRecommendation?
+  repaymentSchedule RepaymentScheduleItem[]
 }
 
 model Transaction {
@@ -111,4 +123,90 @@ model ChatHistory {
   message   String
   isBot     Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model UserTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  type        String   // "INCOME" | "EXPENSE"
+  category    String   // "SALARY", "BUSINESS", "RENT", "FOOD", "UTILITIES", etc.
+  description String
+  date        String   // YYYY-MM-DD
+  isVerified  Boolean  @default(true)
+  source      String   @default("MANUAL")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String
+  amount    Float
+  month     String   // YYYY-MM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month, category])
+}
+
+model SavingsGoal {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  targetDate    String   // YYYY-MM-DD
+  category      String   @default("EMERGENCY")
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RepaymentScheduleItem {
+  id                 String    @id @default(uuid())
+  loanId             String
+  loan               Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  instalmentNumber   Int
+  dueDate            String    // YYYY-MM-DD or ISO
+  emiAmount          Float
+  principalComponent Float
+  interestComponent  Float
+  openingBalance     Float
+  closingBalance     Float
+  status             String    @default("UPCOMING") // "UPCOMING" | "DUE_SOON" | "PAID" | "OVERDUE"
+  paidAt             DateTime?
+  transactionId      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model SavedScenario {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  amount        Float
+  rate          Float
+  tenure        Int
+  emi           Float
+  totalInterest Float
+  totalPayable  Float
+  createdAt     DateTime @default(now())
+}
+
+model LoanDraft {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Float
+  tenureMonths Int
+  purpose      String
+  step         Int      @default(1)
+  data         String   // JSON string
+  updatedAt    DateTime @updatedAt
 }

@@ -376,6 +376,7 @@ export class MockDatabase {
       name: 'System Admin',
       phone: '+919999999991',
       role: 'ADMIN',
+      emailVerified: true,
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -388,6 +389,7 @@ export class MockDatabase {
       name: 'Senior Loan Officer',
       phone: '+919999999992',
       role: 'OFFICER',
+      emailVerified: true,
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -401,6 +403,7 @@ export class MockDatabase {
       name: 'Aarav Sharma (Demo)',
       phone: '+919876543200',
       role: 'BORROWER',
+      emailVerified: true,
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -673,6 +676,7 @@ export class MockDatabase {
         name: prof.name,
         phone: prof.phone,
         role: prof.role,
+        emailVerified: true,
         createdAt: new Date(),
         updatedAt: new Date()
       });

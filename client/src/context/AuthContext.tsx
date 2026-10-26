@@ -8,6 +8,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<any>;
   register: (data: { name: string; email: string; phone: string; password: string; role?: string }) => Promise<any>;
+  verifyOTP: (email: string, otp: string) => Promise<any>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -61,6 +62,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const verifyOTP = async (email: string, otp: string) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/verify-otp', { email, otp });
+      const { user: loggedUser, token: accessToken, refreshToken } = response.data;
+
+      if (loggedUser && accessToken) {
+        setUser(loggedUser);
+        setToken(accessToken);
+        
+        localStorage.setItem('spendify_user', JSON.stringify(loggedUser));
+        localStorage.setItem('spendify_token', accessToken);
+        if (refreshToken) {
+          localStorage.setItem('spendify_refresh_token', refreshToken);
+        }
+      }
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -73,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'OFFICER';
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated, isAdmin }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, verifyOTP, logout, isAuthenticated, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

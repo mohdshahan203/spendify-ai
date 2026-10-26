@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { dbService } from '../services/dbService';
 import { geminiService, UserFinancialContext } from '../services/geminiService';
-import { SAMPLE_PROFILES_DATA } from '../config/db';
 
 export const getAdvisorStatus = async (req: AuthenticatedRequest, res: Response) => {
   const status = geminiService.getStatus();
@@ -95,9 +94,6 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     const userLoans = await dbService.loan.findMany({ where: { userId } });
     const userAlerts = await dbService.alert.findMany({ where: { userId } });
 
-    // Match profile from sample dataset or existing DB metadata if available
-    const matchedProfile = SAMPLE_PROFILES_DATA.find(p => p.email === userRecord?.email);
-
     const activeLoans = userLoans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
     const primaryActiveLoan = activeLoans.length > 0 ? activeLoans[0] : null;
     const latestLoan = userLoans.length > 0 ? userLoans[userLoans.length - 1] : null;
@@ -106,6 +102,21 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     // Retrieve live telemetry and credit assessment
     const { extractBorrowerFeatures, calculateCreditScoreForUser } = await import('../services/creditScoreService');
     const { telemetryStats } = await extractBorrowerFeatures(userId);
+
+    // Compute genuine spending breakdown from user transactions
+    const userTxs = await dbService.userTransaction.findMany({ where: { userId } });
+    const expenseTxs = userTxs.filter((t: any) => t.type === 'EXPENSE');
+    const totalExp = expenseTxs.reduce((sum: number, t: any) => sum + t.amount, 0);
+    const categoryTotals: Record<string, number> = {};
+    for (const t of expenseTxs) {
+      categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+    }
+    const dynamicBreakdown = totalExp > 0
+      ? Object.entries(categoryTotals).map(([name, amount]) => ({
+          name,
+          percentage: Math.round((amount / totalExp) * 100)
+        }))
+      : [];
 
     let creditScore: number | undefined = latestPrediction?.creditScore;
     let riskCategory = latestPrediction?.riskCategory || 'MEDIUM';
@@ -126,7 +137,7 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     const monthlyExpenses = telemetryStats.monthlyExpenses;
     const existingDebtEmis = activeLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
     const monthlySurplus = monthlyIncome - monthlyExpenses - existingDebtEmis;
-    const savings = Math.max(0, Math.round(monthlyIncome * 0.35));
+    const savings = Math.max(0, monthlyIncome - monthlyExpenses - existingDebtEmis);
 
     const context: UserFinancialContext = {
       userName: userRecord?.name || req.user?.email.split('@')[0] || 'Borrower',
@@ -154,12 +165,9 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       allLoansSummary: userLoans.length > 0
         ? userLoans.map(l => `#${l.id.slice(0, 8)} (₹${l.amount}, ${l.tenureMonths}m, ${l.status})`).join('; ')
         : 'No previous loans on record',
-      spendingBreakdown: matchedProfile?.spendingHabits?.categories || [
-        { name: 'Rent & Living', percentage: 40 },
-        { name: 'Food & Essentials', percentage: 30 },
-        { name: 'Discretionary', percentage: 15 },
-        { name: 'Savings Buffer', percentage: 15 }
-      ]
+      spendingBreakdown: dynamicBreakdown.length > 0
+        ? dynamicBreakdown
+        : [{ name: 'Household & Living', percentage: 100 }]
     };
 
     // 2. Fetch past conversation turns

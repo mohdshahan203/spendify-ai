@@ -10,7 +10,6 @@ import {
   simulatePrepayment
 } from '../services/loanMathService';
 import { geminiService } from '../services/geminiService';
-import { SAMPLE_PROFILES_DATA } from '../config/db';
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
@@ -70,17 +69,26 @@ export const getAffordabilitySuggestions = async (req: AuthenticatedRequest, res
       askAI = false
     } = req.body;
 
-    // Load borrower profile for baseline figures
+    // Load borrower telemetry for genuine financial figures
     const userRecord = await dbService.user.findUnique({ where: { id: userId } });
-    const matched = SAMPLE_PROFILES_DATA.find(p => p.email === userRecord?.email);
     const userLoans = await dbService.loan.findMany({ where: { userId } });
-    const activeLoans = userLoans.filter(l => l.status === 'APPROVED' || l.status === 'ACTIVE');
-    const existingDebtFromDb = activeLoans.reduce((sum, l) => sum + (Number(l.emi) || 0), 0);
+    const activeLoans = userLoans.filter((l: any) => l.status === 'APPROVED' || l.status === 'ACTIVE');
+    const existingDebtFromDb = activeLoans.reduce((sum: number, l: any) => sum + (Number(l.emi) || 0), 0);
+    const userTxs = await dbService.userTransaction.findMany({ where: { userId } });
+    const incomeTxs = userTxs.filter((t: any) => t.type === 'INCOME');
+    const expenseTxs = userTxs.filter((t: any) => t.type === 'EXPENSE');
 
-    const monthlyIncome = customIncome ? Number(customIncome) : (matched?.spendingHabits?.monthlyIncome || 55000);
-    const essentialExpenses = customExpenses ? Number(customExpenses) : (matched?.spendingHabits?.monthlyExpenses || 28000);
+    const derivedIncome = incomeTxs.length > 0
+      ? Math.round(incomeTxs.reduce((sum: number, t: any) => sum + t.amount, 0) / Math.max(1, new Set(incomeTxs.map((t: any) => t.date.slice(0, 7))).size))
+      : 0;
+    const derivedExpenses = expenseTxs.length > 0
+      ? Math.round(expenseTxs.reduce((sum: number, t: any) => sum + t.amount, 0) / Math.max(1, new Set(expenseTxs.map((t: any) => t.date.slice(0, 7))).size))
+      : 0;
+
+    const monthlyIncome = customIncome ? Number(customIncome) : derivedIncome;
+    const essentialExpenses = customExpenses ? Number(customExpenses) : derivedExpenses;
     const existingDebtEmis = customExistingEmis !== undefined ? Number(customExistingEmis) : existingDebtFromDb;
-    const savings = matched ? Math.round(monthlyIncome * 0.35) : 30000;
+    const savings = Math.max(0, monthlyIncome - essentialExpenses - existingDebtEmis);
 
     const evaluation = evaluateAffordabilityScenarios(
       {
@@ -96,7 +104,7 @@ export const getAffordabilitySuggestions = async (req: AuthenticatedRequest, res
       Number(requestedTenure)
     );
 
-    let aiExplanation = null;
+    let aiExplanation: string | null = null;
     if (askAI && geminiService.isConfigured()) {
       const prompt = `Based on deterministic calculations:
 - Monthly Income: ₹${monthlyIncome.toLocaleString('en-IN')}
@@ -118,7 +126,7 @@ Briefly explain why this loan scenario is classified as ${evaluation.overallStat
         existingDebtEmis,
         monthlySurplus: evaluation.profile.monthlySurplus
       });
-      if (aiRes.success) {
+      if (aiRes.success && aiRes.reply) {
         aiExplanation = aiRes.reply;
       }
     }
@@ -221,12 +229,12 @@ export const applyForLoan = async (req: AuthenticatedRequest, res: Response) => 
     } catch (mlErr: any) {
       console.warn('ML Service inference failed or offline. Evaluating using deterministic telemetry scoring.');
       const userTxs = await dbService.userTransaction.findMany({ where: { userId } });
-      const incomeTxs = userTxs.filter(t => t.type === 'INCOME');
-      const expenseTxs = userTxs.filter(t => t.type === 'EXPENSE');
-      const inc = incomeTxs.reduce((s, t) => s + t.amount, 0) || 50000;
-      const exp = expenseTxs.reduce((s, t) => s + t.amount, 0) || 25000;
+      const incomeTxs = userTxs.filter((t: any) => t.type === 'INCOME');
+      const expenseTxs = userTxs.filter((t: any) => t.type === 'EXPENSE');
+      const inc = incomeTxs.reduce((s: number, t: any) => s + t.amount, 0);
+      const exp = expenseTxs.reduce((s: number, t: any) => s + t.amount, 0);
       const surplus = inc - exp - quote.emi;
-      const dtiRatio = (quote.emi / inc) * 100;
+      const dtiRatio = inc > 0 ? (quote.emi / inc) * 100 : 100;
       const defaultProbability = Math.min(0.85, Math.max(0.05, (dtiRatio / 100) * 0.6 + (surplus < 0 ? 0.3 : 0)));
       const creditScore = Math.round(Math.max(300, Math.min(900, 900 - defaultProbability * 600)));
       const riskCategory = defaultProbability >= 0.4 ? 'HIGH' : defaultProbability >= 0.2 ? 'MEDIUM' : 'LOW';

@@ -16,6 +16,8 @@ const router = Router();
 
 // --- AUTHENTICATION ROUTES ---
 router.post('/auth/register', authController.register);
+router.post('/auth/verify-otp', authController.verifyOTP);
+router.post('/auth/resend-otp', authController.resendOTP);
 router.post('/auth/login', authController.login);
 router.post('/auth/refresh', authController.refresh);
 

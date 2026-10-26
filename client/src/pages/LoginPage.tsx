@@ -10,6 +10,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
   const { login } = useAuth();
@@ -18,6 +19,7 @@ export const LoginPage: React.FC = () => {
 
   const handleLoginWithCreds = async (eMailToUse: string, pwdToUse: string) => {
     setError(null);
+    setUnverifiedEmail(null);
     setLoading(true);
     try {
       const data = await login(eMailToUse, pwdToUse);
@@ -28,9 +30,16 @@ export const LoginPage: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      const msg = err.response?.data?.error || 'Wrong email or password. Please try again.';
+      const resData = err.response?.data;
+      const msg = resData?.error || 'Wrong email or password. Please try again.';
       setError(msg);
-      toast.error(msg, 'Login Failed');
+
+      if (resData?.unverified) {
+        setUnverifiedEmail(resData.email || eMailToUse);
+        toast.warning('Please complete 6-digit OTP verification to activate your account.', 'Verification Required');
+      } else {
+        toast.error(msg, 'Login Failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -97,7 +106,24 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {error && (
+        {unverifiedEmail && (
+          <div className="p-4 mb-5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col gap-2 shadow-xs">
+            <span className="font-bold flex items-center gap-1.5">
+              ⚠️ Email Verification Required
+            </span>
+            <p className="text-slate-600 leading-relaxed">
+              Your account with <strong className="text-slate-800">{unverifiedEmail}</strong> requires a 6-digit OTP confirmation to activate.
+            </p>
+            <Link
+              to={`/register?step=2&email=${encodeURIComponent(unverifiedEmail)}`}
+              className="mt-1 self-start px-3.5 py-2 rounded-xl bg-primary text-white font-bold hover:bg-[#1B5E20] transition-all text-xs shadow-xs"
+            >
+              Enter Verification Code →
+            </Link>
+          </div>
+        )}
+
+        {error && !unverifiedEmail && (
           <div className="p-3.5 mb-5 text-xs bg-red-50 border border-red-200 text-danger rounded-xl font-semibold flex items-center gap-2">
             <span>{error}</span>
           </div>

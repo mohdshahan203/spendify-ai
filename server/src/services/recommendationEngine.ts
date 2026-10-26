@@ -1,5 +1,4 @@
 import { dbService } from './dbService';
-import { SAMPLE_PROFILES_DATA } from '../config/db';
 import { calculateReducingBalanceEMI } from './loanMathService';
 import { calculateCreditScoreForUser } from './creditScoreService';
 
@@ -70,14 +69,10 @@ export async function generateBorrowerRecommendations(
     monthlyIncomes[month] = (monthlyIncomes[month] || 0) + tx.amount;
   }
 
-  const sampleProfile = SAMPLE_PROFILES_DATA.find(p => p.email === user?.email);
   const incomeValues = Object.values(monthlyIncomes);
-
   let monthlyIncome = 0;
   if (incomeValues.length > 0) {
     monthlyIncome = Math.round(incomeValues.reduce((a, b) => a + b, 0) / incomeValues.length);
-  } else {
-    monthlyIncome = sampleProfile?.spendingHabits?.monthlyIncome || 50000;
   }
 
   // Calculate Income Stability (standard deviation / mean)
@@ -104,8 +99,6 @@ export async function generateBorrowerRecommendations(
   let monthlyExpenses = 0;
   if (expenseValues.length > 0) {
     monthlyExpenses = Math.round(expenseValues.reduce((a, b) => a + b, 0) / expenseValues.length);
-  } else {
-    monthlyExpenses = sampleProfile?.spendingHabits?.monthlyExpenses || 25000;
   }
 
   // Categorize discretionary spending (dining, entertainment, shopping)
